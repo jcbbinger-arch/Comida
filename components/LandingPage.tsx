@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { AppSettings } from '../types';
 import { 
@@ -116,7 +117,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ settings, onEnter }) =
               key={idx} 
               className="bg-slate-900/50 backdrop-blur-sm border border-white/5 p-6 rounded-2xl hover:bg-slate-800/50 hover:border-amber-500/30 transition-all duration-300 group hover:-translate-y-2 shadow-lg"
             >
-              <div className="bg-slate-950 w-14 h-14 rounded-xl flex items-center justify-center mb-4 border border-white/5 group-hover:border-amber-500/20 shadow-inner">
+              <div className="bg-slate-950 w-14 h-14 rounded-xl flex items-center justify-center mb-4 border border-white/5 group-hover:border-amber-500/20 shadow-inner transition-colors">
                 {feat.icon}
               </div>
               <h3 className="text-xl font-bold text-white mb-2 font-serif">{feat.title}</h3>
