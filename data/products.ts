@@ -1,4 +1,3 @@
-
 import { Product, Allergen } from '../types';
 
 // Map codes from the JSON to full Allergen names
@@ -9,8 +8,7 @@ const ALLERGEN_MAP: Record<string, Allergen> = {
   'ALT': 'Altramuces', 'MOL': 'Moluscos'
 };
 
-// Reduced initial dataset (Lightweight for GitHub)
-// Full database can be imported via JSON in the app
+// Reduced initial dataset (Lightweight for GitHub ~50 items)
 const RAW_DATA = [
   {"id":"prod_0001","name":"Solomillo de ternera","category":"carnes","unit":"kg","allergens":[]},
   {"id":"prod_0003","name":"Filete de ternera","category":"carnes","unit":"kg","allergens":[]},
