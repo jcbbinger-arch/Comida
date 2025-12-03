@@ -1,4 +1,3 @@
-
 import { Product, Allergen } from '../types';
 
 // Map codes from the JSON to full Allergen names
@@ -9,8 +8,8 @@ const ALLERGEN_MAP: Record<string, Allergen> = {
   'ALT': 'Altramuces', 'MOL': 'Moluscos'
 };
 
-// Reduced initial dataset (Lightweight for GitHub)
-// Full database can be imported via JSON in the app
+// Reduced initial dataset (Lightweight for GitHub - ~50 Items)
+// Full database can be imported via JSON in the app later.
 const RAW_DATA = [
   {"id":"prod_0001","name":"Solomillo de ternera","category":"carnes","unit":"kg","allergens":[]},
   {"id":"prod_0003","name":"Filete de ternera","category":"carnes","unit":"kg","allergens":[]},
@@ -41,6 +40,8 @@ const RAW_DATA = [
   {"id":"prod_0482","name":"Lechuga Iceberg","category":"verduras","unit":"kg","allergens":[]},
   {"id":"prod_0493","name":"Coliflor","category":"verduras","unit":"kg","allergens":[]},
   {"id":"prod_0561","name":"Champiñón","category":"verduras","unit":"kg","allergens":[]},
+  {"id":"prod_0488","name":"Espinacas","category":"verduras","unit":"kg","allergens":[]},
+  {"id":"prod_0508","name":"Puerro","category":"verduras","unit":"kg","allergens":[]},
 
   {"id":"prod_0731","name":"Manzana Golden","category":"frutas","unit":"kg","allergens":[]},
   {"id":"prod_0748","name":"Limón","category":"frutas","unit":"kg","allergens":[]},

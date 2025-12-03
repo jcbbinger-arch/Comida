@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { AppSettings } from '../types';
 import { 
@@ -45,10 +44,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({ settings, onEnter }) =
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 relative overflow-hidden flex flex-col font-sans selection:bg-amber-500/30">
       
-      {/* Background Effects */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-indigo-900/20 rounded-full blur-[120px] pointer-events-none"></div>
-      <div className="absolute bottom-0 right-0 w-[800px] h-[600px] bg-amber-900/10 rounded-full blur-[100px] pointer-events-none"></div>
-      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5 pointer-events-none"></div>
+      {/* Background Effects - Using standard utility classes instead of arbitrary values for safety */}
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-950 to-black"></div>
+      
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-96 bg-indigo-900/20 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="absolute bottom-0 right-0 w-96 h-96 bg-amber-900/10 rounded-full blur-3xl pointer-events-none"></div>
+      
+      {/* Texture overlay using standard opacity */}
+      <div className="absolute inset-0 opacity-5 pointer-events-none" style={{backgroundImage: 'radial-gradient(#ffffff 1px, transparent 1px)', backgroundSize: '20px 20px'}}></div>
 
       {/* Header / Navbar */}
       <nav className="relative z-10 w-full px-6 py-6 flex flex-col md:flex-row justify-between items-center gap-6 border-b border-white/5 bg-slate-900/50 backdrop-blur-md">
@@ -86,7 +89,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ settings, onEnter }) =
         
         {/* Hero Section */}
         <div className="text-center max-w-4xl mx-auto mb-20 animate-fade-in-up">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold uppercase tracking-widest mb-6 shadow-glow">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold uppercase tracking-widest mb-6 shadow-sm shadow-amber-900/20">
             <UtensilsCrossed size={12} /> Gestión Gastronómica Integral v2.0
           </div>
           
@@ -101,7 +104,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ settings, onEnter }) =
 
           <button 
             onClick={onEnter}
-            className="group relative inline-flex items-center gap-3 px-8 py-4 bg-white text-slate-900 rounded-xl font-bold text-lg hover:bg-amber-50 transition-all hover:scale-105 shadow-[0_0_40px_-10px_rgba(255,255,255,0.3)]"
+            className="group relative inline-flex items-center gap-3 px-8 py-4 bg-white text-slate-900 rounded-xl font-bold text-lg hover:bg-amber-50 transition-all hover:scale-105 shadow-xl"
           >
             Entrar al Panel
             <div className="bg-slate-900 rounded-full p-1 group-hover:translate-x-1 transition-transform">
@@ -140,9 +143,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({ settings, onEnter }) =
         }
         .animate-fade-in-up {
           animation: fadeInUp 0.8s ease-out forwards;
-        }
-        .shadow-glow {
-          box-shadow: 0 0 15px rgba(245, 158, 11, 0.15);
         }
       `}</style>
     </div>
