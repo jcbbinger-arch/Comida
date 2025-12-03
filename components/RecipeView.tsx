@@ -1,4 +1,3 @@
-
 import React, { useMemo } from 'react';
 import { Recipe, AppSettings, Allergen } from '../types';
 import { Printer, ArrowLeft, Info, AlertOctagon } from 'lucide-react';
