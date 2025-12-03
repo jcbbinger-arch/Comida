@@ -1,88 +1,149 @@
 import React from 'react';
 import { AppSettings } from '../types';
-import { ChefHat, ArrowRight, School, User } from 'lucide-react';
+import { 
+  ChefHat, 
+  ArrowRight, 
+  School, 
+  User, 
+  BookOpen, 
+  ShieldAlert, 
+  CalendarDays, 
+  Database,
+  UtensilsCrossed
+} from 'lucide-react';
 
 interface LandingPageProps {
   settings: AppSettings;
   onEnter: () => void;
 }
 
+const FEATURES = [
+  {
+    icon: <BookOpen className="text-amber-400" size={32} />,
+    title: "Fichas Técnicas",
+    desc: "Crea recetas compuestas con escandallos precisos, fotos y control de costes."
+  },
+  {
+    icon: <ShieldAlert className="text-red-400" size={32} />,
+    title: "Control Alérgenos",
+    desc: "Detección automática de alérgenos basada en la base de datos de ingredientes."
+  },
+  {
+    icon: <CalendarDays className="text-blue-400" size={32} />,
+    title: "Planificador de Menús",
+    desc: "Organiza servicios completos y genera órdenes de trabajo al instante."
+  },
+  {
+    icon: <Database className="text-emerald-400" size={32} />,
+    title: "Base de Datos",
+    desc: "Gestión centralizada de más de 1700 materias primas y productos."
+  }
+];
+
 export const LandingPage: React.FC<LandingPageProps> = ({ settings, onEnter }) => {
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 relative overflow-hidden">
-      {/* Background decoration */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-slate-800 via-slate-900 to-slate-950"></div>
-      <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none" 
-           style={{ backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '30px 30px' }}>
-      </div>
+    <div className="min-h-screen bg-slate-950 text-slate-200 relative overflow-hidden flex flex-col font-sans selection:bg-amber-500/30">
+      
+      {/* Background Effects */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-indigo-900/20 rounded-full blur-[120px] pointer-events-none"></div>
+      <div className="absolute bottom-0 right-0 w-[800px] h-[600px] bg-amber-900/10 rounded-full blur-[100px] pointer-events-none"></div>
+      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5 pointer-events-none"></div>
 
-      <div className="max-w-5xl w-full bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row relative z-10 animate-fade-in">
+      {/* Header / Navbar */}
+      <nav className="relative z-10 w-full px-6 py-6 flex flex-col md:flex-row justify-between items-center gap-6 border-b border-white/5 bg-slate-900/50 backdrop-blur-md">
+        <div className="flex items-center gap-4">
+           <div className="bg-white/10 p-2 rounded-lg border border-white/10">
+              {settings.instituteLogo ? (
+                <img src={settings.instituteLogo} alt="IES" className="h-10 w-auto object-contain" />
+              ) : (
+                <School className="text-slate-400" size={32} />
+              )}
+           </div>
+           <div className="text-left">
+              <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Centro Educativo</p>
+              <h2 className="text-lg font-serif font-bold text-white leading-none">{settings.instituteName}</h2>
+           </div>
+        </div>
+
+        <div className="flex items-center gap-4">
+           <div className="text-right hidden md:block">
+              <p className="text-[10px] uppercase tracking-widest text-amber-500 font-bold">Profesor Responsable</p>
+              <h2 className="text-lg font-medium text-white leading-none">{settings.teacherName}</h2>
+           </div>
+           <div className="h-12 w-12 rounded-full border-2 border-slate-700 overflow-hidden bg-slate-800 shadow-lg">
+              {settings.teacherLogo ? (
+                <img src={settings.teacherLogo} alt="Profe" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center"><User size={20} className="text-slate-500"/></div>
+              )}
+           </div>
+        </div>
+      </nav>
+
+      {/* Main Content */}
+      <main className="flex-grow flex flex-col items-center justify-center relative z-10 px-4 py-16 md:py-20">
         
-        {/* Left Side - Identity */}
-        <div className="bg-slate-50 p-8 md:p-12 md:w-1/2 flex flex-col justify-between border-r border-slate-100">
-           <div className="space-y-10">
-              {/* Institute */}
-              <div className="flex items-start gap-5">
-                 <div className="w-20 h-20 bg-white rounded-xl shadow-sm flex items-center justify-center border border-slate-200 p-2 shrink-0">
-                    {settings.instituteLogo ? (
-                      <img src={settings.instituteLogo} alt="IES" className="w-full h-full object-contain" />
-                    ) : (
-                      <School className="text-slate-400" size={36} />
-                    )}
-                 </div>
-                 <div>
-                    <span className="inline-block py-1 px-2 rounded bg-slate-200 text-[10px] uppercase tracking-wider text-slate-600 font-bold mb-1">Centro Educativo</span>
-                    <h2 className="text-2xl font-bold text-slate-800 leading-tight">{settings.instituteName}</h2>
-                 </div>
-              </div>
+        {/* Hero Section */}
+        <div className="text-center max-w-4xl mx-auto mb-20 animate-fade-in-up">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold uppercase tracking-widest mb-6 shadow-glow">
+            <UtensilsCrossed size={12} /> Gestión Gastronómica Integral v2.0
+          </div>
+          
+          <h1 className="text-5xl md:text-7xl font-serif font-bold text-white mb-6 leading-tight tracking-tight">
+            Digitaliza tu <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-amber-500">Cocina</span>
+          </h1>
+          
+          <p className="text-lg md:text-xl text-slate-400 mb-10 max-w-2xl mx-auto leading-relaxed">
+            La herramienta definitiva para escuelas de hostelería. 
+            Crea fichas técnicas profesionales, gestiona alérgenos automáticamente y planifica tus servicios con precisión milimétrica.
+          </p>
 
-              {/* Teacher */}
-              <div className="flex items-start gap-5">
-                 <div className="w-20 h-20 bg-white rounded-full shadow-sm flex items-center justify-center border border-slate-200 overflow-hidden shrink-0">
-                    {settings.teacherLogo ? (
-                      <img src={settings.teacherLogo} alt="Profesor" className="w-full h-full object-cover" />
-                    ) : (
-                      <User className="text-slate-400" size={36} />
-                    )}
-                 </div>
-                 <div>
-                    <span className="inline-block py-1 px-2 rounded bg-amber-100 text-[10px] uppercase tracking-wider text-amber-700 font-bold mb-1">Profesor Responsable</span>
-                    <h2 className="text-2xl font-bold text-slate-800 leading-tight">{settings.teacherName}</h2>
-                 </div>
-              </div>
-           </div>
-
-           <div className="mt-12 pt-6 border-t border-slate-200 text-xs text-slate-400 flex justify-between items-center">
-              <span>Departamento de Hostelería y Turismo</span>
-              <span>v1.0</span>
-           </div>
+          <button 
+            onClick={onEnter}
+            className="group relative inline-flex items-center gap-3 px-8 py-4 bg-white text-slate-900 rounded-xl font-bold text-lg hover:bg-amber-50 transition-all hover:scale-105 shadow-[0_0_40px_-10px_rgba(255,255,255,0.3)]"
+          >
+            Entrar al Panel
+            <div className="bg-slate-900 rounded-full p-1 group-hover:translate-x-1 transition-transform">
+               <ArrowRight size={16} className="text-white" />
+            </div>
+          </button>
         </div>
 
-        {/* Right Side - App Entry */}
-        <div className="p-8 md:p-12 md:w-1/2 bg-white flex flex-col justify-center items-center text-center relative">
-           <div className="absolute top-0 right-0 p-4 opacity-10">
-              <ChefHat size={120} />
-           </div>
-
-           <div className="w-24 h-24 bg-amber-500 rounded-2xl flex items-center justify-center mb-8 text-white shadow-lg shadow-amber-500/30 rotate-3 transition-transform hover:rotate-6">
-              <ChefHat size={48} />
-           </div>
-           
-           <h1 className="text-4xl md:text-5xl font-serif font-bold text-slate-900 mb-3 tracking-tight">Mis Recetas</h1>
-           <p className="text-lg text-slate-500 mb-10 max-w-xs mx-auto leading-relaxed font-light">
-             Gestión integral de fichas técnicas, control de alérgenos y planificación de servicios.
-           </p>
-
-           <button 
-             onClick={onEnter}
-             className="group relative inline-flex items-center gap-3 px-8 py-4 bg-slate-900 text-white rounded-xl font-bold text-lg hover:bg-slate-800 transition-all hover:-translate-y-1 shadow-xl hover:shadow-2xl w-full md:w-auto justify-center"
-           >
-             Acceder a la Aplicación
-             <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
-           </button>
+        {/* Feature Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 w-full max-w-7xl mx-auto px-4">
+          {FEATURES.map((feat, idx) => (
+            <div 
+              key={idx} 
+              className="bg-slate-900/50 backdrop-blur-sm border border-white/5 p-6 rounded-2xl hover:bg-slate-800/50 hover:border-amber-500/30 transition-all duration-300 group hover:-translate-y-2 shadow-lg"
+            >
+              <div className="bg-slate-950 w-14 h-14 rounded-xl flex items-center justify-center mb-4 border border-white/5 group-hover:border-amber-500/20 shadow-inner">
+                {feat.icon}
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2 font-serif">{feat.title}</h3>
+              <p className="text-sm text-slate-400 leading-relaxed">{feat.desc}</p>
+            </div>
+          ))}
         </div>
 
-      </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="relative z-10 border-t border-white/5 bg-slate-950 py-6 text-center text-xs text-slate-600">
+        <p>© {new Date().getFullYear()} {settings.instituteName} • Departamento de Hostelería • Developed with React & Tailwind</p>
+      </footer>
+
+      <style>{`
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in-up {
+          animation: fadeInUp 0.8s ease-out forwards;
+        }
+        .shadow-glow {
+          box-shadow: 0 0 15px rgba(245, 158, 11, 0.15);
+        }
+      `}</style>
     </div>
   );
 };
