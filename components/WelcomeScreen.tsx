@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChefHat, BookOpen, ShieldCheck, Calendar, ArrowRight, School, User } from 'lucide-react';
+import { ChefHat, BookOpen, ShieldCheck, Calendar, ArrowRight, School, User, Database } from 'lucide-react';
 import { AppSettings } from '../types';
 
 interface WelcomeScreenProps {
@@ -17,125 +17,141 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ settings, onEnter 
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 font-sans relative overflow-hidden">
       
-      {/* Background Decorative Elements */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-        <div className="absolute -top-24 -left-24 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl"></div>
-        <div className="absolute top-1/2 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-0 left-1/3 w-80 h-80 bg-slate-700/20 rounded-full blur-3xl"></div>
+      {/* Abstract Background */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-[20%] -right-[10%] w-[50%] h-[50%] bg-amber-600/10 rounded-full blur-[120px]"></div>
+        <div className="absolute top-[20%] -left-[10%] w-[40%] h-[40%] bg-blue-900/20 rounded-full blur-[120px]"></div>
+        <div className="absolute bottom-[10%] right-[20%] w-[30%] h-[30%] bg-slate-800/30 rounded-full blur-[100px]"></div>
+        {/* Subtle grid pattern overlay */}
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.03]"></div>
       </div>
 
-      <div className={`max-w-5xl w-full z-10 transition-all duration-1000 transform ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
+      <div className={`max-w-6xl w-full z-10 transition-all duration-1000 ease-out transform ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'}`}>
         
-        {/* Main Card */}
-        <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl overflow-hidden border border-white/20">
-          <div className="flex flex-col md:flex-row">
-            
-            {/* Left Column: Identity */}
-            <div className="md:w-5/12 bg-slate-50 p-8 md:p-12 flex flex-col justify-between border-r border-gray-100 relative">
-               <div className="space-y-8 relative z-10">
-                  {/* Logos Section */}
-                  <div className="space-y-6">
-                    {/* Institute */}
-                    <div className="flex items-center gap-4 group">
-                       <div className="w-16 h-16 bg-white rounded-xl shadow-sm border border-gray-200 flex items-center justify-center p-2 overflow-hidden transition-transform group-hover:scale-105 duration-300">
-                          {settings.instituteLogo ? (
-                            <img src={settings.instituteLogo} alt="Logo IES" className="w-full h-full object-contain" />
-                          ) : (
-                            <School className="text-slate-400" size={32} />
-                          )}
-                       </div>
-                       <div>
-                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Centro Educativo</p>
-                          <h2 className="text-lg font-bold text-slate-800 leading-tight">{settings.instituteName}</h2>
-                       </div>
-                    </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-800/50 min-h-[600px]">
+          
+          {/* LEFT: Hero / Branding Section */}
+          <div className="relative bg-slate-900 p-10 lg:p-16 flex flex-col justify-between text-white overflow-hidden">
+             {/* Decorative circle */}
+             <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-bl-full pointer-events-none"></div>
+             
+             {/* Identity Header */}
+             <div className="relative z-10 space-y-8">
+                <div className="flex items-center gap-4">
+                   <div className="bg-white/10 p-3 rounded-xl backdrop-blur-sm border border-white/10">
+                      <ChefHat size={32} className="text-amber-400" />
+                   </div>
+                   <div>
+                      <h1 className="text-3xl lg:text-4xl font-serif font-bold text-white tracking-wide">Mis Recetas</h1>
+                      <p className="text-slate-400 text-sm tracking-widest uppercase">Gestión Gastronómica</p>
+                   </div>
+                </div>
 
-                    {/* Teacher */}
-                    <div className="flex items-center gap-4 group">
-                       <div className="w-16 h-16 bg-white rounded-xl shadow-sm border border-gray-200 flex items-center justify-center overflow-hidden transition-transform group-hover:scale-105 duration-300">
-                          {settings.teacherLogo ? (
-                            <img src={settings.teacherLogo} alt="Logo Profesor" className="w-full h-full object-cover" />
-                          ) : (
-                            <User className="text-slate-400" size={32} />
-                          )}
-                       </div>
-                       <div>
-                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Profesor Responsable</p>
-                          <h2 className="text-lg font-bold text-slate-800 leading-tight">{settings.teacherName}</h2>
-                       </div>
-                    </div>
-                  </div>
-               </div>
+                <div className="space-y-6 pt-8 border-t border-white/10">
+                   <div className="flex items-center gap-4">
+                      {settings.instituteLogo ? (
+                        <div className="w-14 h-14 bg-white rounded-lg p-1 flex items-center justify-center shrink-0">
+                           <img src={settings.instituteLogo} alt="IES" className="w-full h-full object-contain" />
+                        </div>
+                      ) : (
+                        <div className="w-14 h-14 bg-white/10 rounded-lg flex items-center justify-center shrink-0">
+                           <School size={24} className="text-slate-300" />
+                        </div>
+                      )}
+                      <div>
+                         <p className="text-[10px] uppercase tracking-wider text-amber-500 font-bold mb-0.5">Centro Educativo</p>
+                         <h3 className="text-lg font-medium text-slate-100 leading-tight">{settings.instituteName}</h3>
+                      </div>
+                   </div>
 
-               <div className="mt-12">
-                  <div className="w-12 h-1 bg-amber-500 rounded-full mb-4"></div>
-                  <h3 className="text-3xl font-serif font-bold text-slate-900 mb-2">Mis Recetas</h3>
-                  <p className="text-slate-500">Gestión Integral de Fichas Técnicas de Cocina y Pastelería.</p>
-               </div>
-            </div>
+                   <div className="flex items-center gap-4">
+                      {settings.teacherLogo ? (
+                        <div className="w-14 h-14 bg-white rounded-lg overflow-hidden shrink-0 border-2 border-white/20">
+                           <img src={settings.teacherLogo} alt="Profesor" className="w-full h-full object-cover" />
+                        </div>
+                      ) : (
+                        <div className="w-14 h-14 bg-white/10 rounded-lg flex items-center justify-center shrink-0">
+                           <User size={24} className="text-slate-300" />
+                        </div>
+                      )}
+                      <div>
+                         <p className="text-[10px] uppercase tracking-wider text-amber-500 font-bold mb-0.5">Profesor Responsable</p>
+                         <h3 className="text-lg font-medium text-slate-100 leading-tight">{settings.teacherName}</h3>
+                      </div>
+                   </div>
+                </div>
+             </div>
 
-            {/* Right Column: Features & Action */}
-            <div className="md:w-7/12 p-8 md:p-12 flex flex-col justify-center bg-white">
-               
-               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-10">
-                  <FeatureCard 
-                    icon={<BookOpen className="text-amber-600" />}
-                    title="Fichas Técnicas"
-                    desc="Estandarización de recetas, cálculo de costes y procesos detallados."
-                  />
-                  <FeatureCard 
-                    icon={<ShieldCheck className="text-red-600" />}
-                    title="Control de Alérgenos"
-                    desc="Detección automática y base de datos de productos actualizada."
-                  />
-                  <FeatureCard 
-                    icon={<Calendar className="text-indigo-600" />}
-                    title="Planificador de Menús"
-                    desc="Organización de eventos, órdenes de servicio y matrices."
-                  />
-                  <FeatureCard 
-                    icon={<ChefHat className="text-slate-700" />}
-                    title="Gestión Profesional"
-                    desc="Herramientas digitales para el control de la producción culinaria."
-                  />
-               </div>
-
-               <div className="flex justify-center md:justify-start">
-                 <button 
-                   onClick={onEnter}
-                   className="group relative px-8 py-4 bg-slate-900 text-white font-bold rounded-xl shadow-lg hover:bg-slate-800 hover:shadow-xl transition-all duration-300 overflow-hidden w-full md:w-auto"
-                 >
-                   <span className="relative z-10 flex items-center justify-center gap-3">
-                     Entrar a la Aplicación <ArrowRight className="group-hover:translate-x-1 transition-transform" />
-                   </span>
-                   <div className="absolute inset-0 bg-gradient-to-r from-slate-800 to-slate-900 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                 </button>
-               </div>
-
-            </div>
+             {/* Bottom Decoration */}
+             <div className="relative z-10 pt-12 mt-auto">
+                <p className="text-slate-400 text-xs italic border-l-2 border-amber-500 pl-4">
+                  "La cocina es un lenguaje mediante el cual se puede expresar armonía, felicidad, belleza, poesía, complejidad, magia, humor, provocación, cultura."
+                </p>
+             </div>
           </div>
-        </div>
-        
-        {/* Footer */}
-        <div className="mt-8 text-center text-slate-500 text-xs opacity-60">
-          &copy; {new Date().getFullYear()} {settings.instituteName} • Desarrollado para el Departamento de Hostelería
-        </div>
 
+          {/* RIGHT: Features / Action */}
+          <div className="bg-slate-50 p-10 lg:p-16 flex flex-col justify-center">
+             <div className="mb-10">
+                <h2 className="text-2xl font-bold text-slate-800 mb-2">Bienvenido al Panel de Control</h2>
+                <p className="text-slate-500">Herramientas digitales para la estandarización y control de procesos culinarios.</p>
+             </div>
+
+             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-12">
+                <FeatureBox 
+                  icon={<BookOpen size={20} className="text-blue-600"/>}
+                  title="Fichas Técnicas"
+                  desc="Escandallos y procesos"
+                />
+                <FeatureBox 
+                  icon={<ShieldCheck size={20} className="text-red-600"/>}
+                  title="Alérgenos"
+                  desc="Control seguridad alimentaria"
+                />
+                <FeatureBox 
+                  icon={<Calendar size={20} className="text-amber-600"/>}
+                  title="Menús y Eventos"
+                  desc="Planificación de servicios"
+                />
+                <FeatureBox 
+                  icon={<Database size={20} className="text-emerald-600"/>}
+                  title="Base de Datos"
+                  desc="Gestión de materias primas"
+                />
+             </div>
+
+             <button 
+               onClick={onEnter}
+               className="group w-full bg-slate-900 text-white text-lg font-medium py-4 px-6 rounded-xl hover:bg-slate-800 transition-all shadow-xl hover:shadow-2xl flex items-center justify-center gap-3 relative overflow-hidden"
+             >
+               <span className="relative z-10">Acceder a la Aplicación</span>
+               <ArrowRight className="relative z-10 group-hover:translate-x-1 transition-transform" />
+               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
+             </button>
+             
+             <div className="mt-8 text-center">
+                <p className="text-xs text-slate-400">
+                  Versión 1.0 • IES La Flota
+                </p>
+             </div>
+          </div>
+
+        </div>
       </div>
     </div>
   );
 };
 
-const FeatureCard = ({ icon, title, desc }: { icon: React.ReactNode, title: string, desc: string }) => (
-  <div className="flex gap-4 items-start p-3 hover:bg-slate-50 rounded-lg transition-colors duration-300">
-    <div className="p-3 bg-slate-50 rounded-lg shrink-0">
+const FeatureBox = ({ icon, title, desc }: { icon: React.ReactNode, title: string, desc: string }) => (
+  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow hover:border-slate-300 flex items-start gap-3">
+    <div className="bg-slate-50 p-2 rounded-lg shrink-0">
       {icon}
     </div>
     <div>
-      <h4 className="font-bold text-slate-800 mb-1">{title}</h4>
-      <p className="text-xs text-slate-500 leading-relaxed">{desc}</p>
+      <h3 className="font-bold text-slate-800 text-sm">{title}</h3>
+      <p className="text-xs text-slate-500">{desc}</p>
     </div>
   </div>
 );
