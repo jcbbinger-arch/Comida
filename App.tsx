@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Recipe, AppSettings, AppBackup, Product } from './types';
 import { useLocalStorage } from './hooks/useLocalStorage';
@@ -7,7 +8,6 @@ import { RecipeView } from './components/RecipeView';
 import { SettingsModal } from './components/SettingsModal';
 import { MenuPlanner } from './components/MenuPlanner';
 import { ProductDatabaseViewer } from './components/ProductDatabaseViewer';
-import { WelcomeScreen } from './components/WelcomeScreen';
 import { INITIAL_PRODUCT_DATABASE } from './data/products';
 
 type ViewState = 'DASHBOARD' | 'EDITOR' | 'VIEWER' | 'MENU_PLANNER' | 'PRODUCT_DB';
@@ -24,17 +24,11 @@ function App() {
   const [settings, setSettings] = useLocalStorage<AppSettings>('appSettings', defaultSettings);
   const [productDatabase, setProductDatabase] = useLocalStorage<Product[]>('productDatabase', INITIAL_PRODUCT_DATABASE);
   
-  // App State - Default showWelcome to true
-  const [showWelcome, setShowWelcome] = useState(true);
   const [viewState, setViewState] = useState<ViewState>('DASHBOARD');
   const [currentRecipe, setCurrentRecipe] = useState<Recipe | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // --- Actions ---
-
-  const handleEnterApp = () => {
-    setShowWelcome(false);
-  };
 
   const handleCreateNew = () => {
     setCurrentRecipe(null);
@@ -42,6 +36,7 @@ function App() {
   };
 
   const handleEdit = (recipe: Recipe) => {
+    // Check if recipe needs migration in memory before editing
     const preparedRecipe = migrateRecipeIfNeeded(recipe);
     setCurrentRecipe(preparedRecipe);
     setViewState('EDITOR');
@@ -73,22 +68,29 @@ function App() {
     });
 
     // 2. Auto-Learn New Ingredients
+    // We scan the recipe for ingredients that are NOT in our database and add them.
     const newProducts: Product[] = [];
+    // Create a Set of existing lowercased names for O(1) lookup
     const existingNames = new Set(productDatabase.map(p => p.name.trim().toLowerCase()));
 
     recipe.subRecipes.forEach(sub => {
       sub.ingredients.forEach(ing => {
         const normalizedName = ing.name.trim();
+        // If it has a name and is not in database
         if (normalizedName && !existingNames.has(normalizedName.toLowerCase())) {
+          
+          // Avoid duplicates within the same batch
           const alreadyAdded = newProducts.find(p => p.name.toLowerCase() === normalizedName.toLowerCase());
+          
           if (!alreadyAdded) {
             newProducts.push({
               id: `custom_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
               name: normalizedName,
-              category: 'Otros',
+              category: 'Otros', // Default category for learned items
               unit: ing.unit || 'kg',
               allergens: ing.allergens || []
             });
+            // Add to set to prevent duplicate adds in this loop
             existingNames.add(normalizedName.toLowerCase());
           }
         }
@@ -97,11 +99,14 @@ function App() {
 
     if (newProducts.length > 0) {
       setProductDatabase(prev => [...prev, ...newProducts]);
+      console.log(`Auto-learned ${newProducts.length} new ingredients.`);
     }
 
     setViewState('DASHBOARD');
     setCurrentRecipe(null);
   };
+
+  // --- Product Database CRUD Actions ---
 
   const handleProductAdd = (newProduct: Product) => {
     setProductDatabase(prev => [newProduct, ...prev]);
@@ -128,6 +133,7 @@ function App() {
           } else {
             addedCount++;
           }
+          // Update existing or add new
           currentMap.set(p.id, p);
         }
       });
@@ -138,7 +144,9 @@ function App() {
   };
 
   const handleImport = (recipe: Recipe) => {
+     // Ensure imported recipe has valid structure
      const migrated = migrateRecipeIfNeeded(recipe);
+     // Assign new ID to avoid collisions
      migrated.id = Date.now().toString(); 
      setRecipes(prev => [migrated, ...prev]);
   };
@@ -151,14 +159,18 @@ function App() {
   const handleRestoreBackup = (backup: AppBackup) => {
     setRecipes(backup.recipes);
     setSettings(backup.settings);
+    // If backup has product database, restore it, otherwise keep existing or default
     if (backup.productDatabase && backup.productDatabase.length > 0) {
       setProductDatabase(backup.productDatabase);
     }
     alert('Copia de seguridad restaurada correctamente.');
   };
 
+  // Helper to migrate old single-ingredient recipes to new multi-subrecipe structure on the fly
   const migrateRecipeIfNeeded = (r: Recipe): Recipe => {
     if (r.subRecipes && r.subRecipes.length > 0) return r;
+    
+    // Create a subrecipe from legacy data
     return {
       ...r,
       subRecipes: [{
@@ -172,9 +184,7 @@ function App() {
     };
   };
 
-  if (showWelcome) {
-    return <WelcomeScreen settings={settings} onEnter={handleEnterApp} />;
-  }
+  // --- Render ---
 
   return (
     <>

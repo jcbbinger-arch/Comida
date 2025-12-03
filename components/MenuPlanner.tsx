@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Recipe, AppSettings, ALLERGEN_LIST, Allergen } from '../types';
 import { Plus, Trash2, ArrowLeft, Printer, Search, ArrowUp, ArrowDown, Calendar, FileText, Utensils, AlertOctagon } from 'lucide-react';
