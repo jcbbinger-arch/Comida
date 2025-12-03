@@ -1,7 +1,6 @@
-
 import React, { useState, useRef } from 'react';
 import { Recipe, AppSettings, Allergen } from '../types';
-import { Plus, Search, Eye, Edit2, Trash2, Download, Upload, ChefHat, Settings, Calendar, Database } from 'lucide-react';
+import { Plus, Search, Eye, Edit2, Trash2, Download, Upload, ChefHat, Settings, Calendar, Database, LogOut } from 'lucide-react';
 
 interface DashboardProps {
   recipes: Recipe[];
@@ -14,6 +13,7 @@ interface DashboardProps {
   onOpenSettings: () => void;
   onOpenMenuPlanner: () => void;
   onOpenProductDB: () => void;
+  onLogout: () => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ 
@@ -26,7 +26,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onImport,
   onOpenSettings,
   onOpenMenuPlanner,
-  onOpenProductDB
+  onOpenProductDB,
+  onLogout
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -37,7 +38,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
   );
 
   const handleExport = (recipe: Recipe) => {
-    // Use Blob API for robust file download (handles large base64 strings better than data URIs)
     const jsonString = JSON.stringify(recipe, null, 2);
     const blob = new Blob([jsonString], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -48,7 +48,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
     document.body.appendChild(downloadAnchorNode);
     downloadAnchorNode.click();
     
-    // Cleanup
     document.body.removeChild(downloadAnchorNode);
     URL.revokeObjectURL(url);
   };
@@ -65,7 +64,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
     reader.onload = (e) => {
       try {
         const json = JSON.parse(e.target?.result as string);
-        // Basic validation updated for new structure
         if (json.name) {
             const newRecipe = { ...json, id: Date.now().toString() };
             onImport(newRecipe);
@@ -86,7 +84,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
      if (recipe.subRecipes) {
        recipe.subRecipes.forEach(sub => sub.ingredients.forEach(i => i.allergens?.forEach(a => set.add(a))));
      } else if (recipe.ingredients) {
-       // Legacy fallback
        recipe.ingredients.forEach(i => i.allergens?.forEach(a => set.add(a)));
      }
      return Array.from(set);
@@ -108,11 +105,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
                  )}
                  {settings.instituteLogo && <span>{settings.instituteName}</span>}
               </div>
-              <div className="flex items-center gap-3">
-                 <span>{settings.teacherName}</span>
-                 {settings.teacherLogo && (
-                   <img src={settings.teacherLogo} alt="Teacher" className="h-8 w-8 rounded-full object-cover border border-slate-700" />
-                 )}
+              <div className="flex items-center gap-4">
+                 <div className="flex items-center gap-2">
+                   {settings.teacherLogo && (
+                     <img src={settings.teacherLogo} alt="Teacher" className="h-6 w-6 rounded-full object-cover border border-slate-700" />
+                   )}
+                   <span>{settings.teacherName}</span>
+                 </div>
+                 <div className="h-4 w-px bg-slate-700"></div>
+                 <button onClick={onLogout} className="text-slate-400 hover:text-white transition-colors flex items-center gap-1" title="Salir al inicio">
+                    <LogOut size={16} /> <span className="text-xs">Salir</span>
+                 </button>
               </div>
            </div>
         </div>
