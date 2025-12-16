@@ -1,7 +1,6 @@
 import React from 'react';
 import { AppSettings } from '../types';
 import { 
-  ChefHat, 
   ArrowRight, 
   School, 
   User, 
@@ -44,13 +43,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({ settings, onEnter }) =
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 relative overflow-hidden flex flex-col font-sans selection:bg-amber-500/30">
       
-      {/* Background Effects - Using standard utility classes instead of arbitrary values for safety */}
+      {/* Background Effects */}
       <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-950 to-black"></div>
-      
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-96 bg-indigo-900/20 rounded-full blur-3xl pointer-events-none"></div>
       <div className="absolute bottom-0 right-0 w-96 h-96 bg-amber-900/10 rounded-full blur-3xl pointer-events-none"></div>
       
-      {/* Texture overlay using standard opacity */}
+      {/* Texture overlay */}
       <div className="absolute inset-0 opacity-5 pointer-events-none" style={{backgroundImage: 'radial-gradient(#ffffff 1px, transparent 1px)', backgroundSize: '20px 20px'}}></div>
 
       {/* Header / Navbar */}
@@ -131,9 +129,29 @@ export const LandingPage: React.FC<LandingPageProps> = ({ settings, onEnter }) =
 
       </main>
 
-      {/* Footer */}
-      <footer className="relative z-10 border-t border-white/5 bg-slate-950 py-6 text-center text-xs text-slate-600">
-        <p>© {new Date().getFullYear()} {settings.instituteName} • Departamento de Hostelería • Developed with React & Tailwind</p>
+      {/* Author Footer */}
+      <footer className="relative z-10 bg-slate-950 py-12 flex flex-col items-center border-t border-white/5">
+        
+        <p className="text-[10px] uppercase tracking-[0.2em] text-indigo-400 font-bold mb-6">Created by</p>
+        
+        <div className="bg-slate-900 rounded-2xl p-1.5 pr-8 flex items-center gap-4 border border-slate-800 shadow-2xl hover:border-indigo-500/30 transition-all duration-300 group">
+          <div className="h-16 w-16 rounded-xl bg-white p-0.5 flex items-center justify-center overflow-hidden relative shadow-inner">
+             <img 
+               src="https://lh3.googleusercontent.com/d/1DkCOqFGdw3PZbyNUnTQNgeaAGjBfv1_e" 
+               alt="Juan Codina" 
+               className="w-full h-full object-contain"
+             />
+          </div>
+          
+          <div className="text-left">
+            <h3 className="text-xl font-serif font-bold text-white leading-tight group-hover:text-indigo-200 transition-colors">Juan Codina</h3>
+            <p className="text-xs text-slate-500 font-medium">Original Design & Development</p>
+          </div>
+        </div>
+
+        <div className="mt-12 text-[10px] text-slate-600">
+          © {new Date().getFullYear()} {settings.instituteName} • Departamento de Hostelería
+        </div>
       </footer>
 
       <style>{`
