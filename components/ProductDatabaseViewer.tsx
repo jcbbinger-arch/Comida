@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useRef } from 'react';
 import { Product, Allergen, ALLERGEN_LIST } from '../types';
-import { Search, Plus, ArrowLeft, Edit2, Trash2, Save, X, Shield, Check, Download, Upload, DollarSign, Copy, FileJson, FileSpreadsheet } from 'lucide-react';
+import { Search, Plus, ArrowLeft, Edit2, Trash2, Save, X, Shield, Check, Download, Upload, DollarSign, Copy, FileJson, FileSpreadsheet, Database } from 'lucide-react';
 
 interface ProductDatabaseViewerProps {
   products: Product[];
@@ -45,21 +45,13 @@ Devuelve exclusivamente el array JSON [ ... ].`;
     return ALLERGEN_LIST.find(a => a.toLowerCase() === clean) || null;
   };
 
-  /**
-   * Lógica de Merge (Fusión):
-   * 1. Toma la lista actual (products).
-   * 2. Itera sobre los nuevos.
-   * 3. Si el nombre coincide, actualiza.
-   * 4. Si no, añade.
-   */
   const processImportedList = (importedList: any[]) => {
-    const updatedDatabase = [...products]; // Comenzamos con lo que ya tenemos
+    const updatedDatabase = [...products];
     let addedCount = 0;
     let updatedCount = 0;
 
     importedList.forEach((newProd: any) => {
       const cleanName = newProd.name.trim();
-      // Buscamos si ya existe por nombre (insensible a mayúsculas)
       const index = updatedDatabase.findIndex(p => p.name.trim().toLowerCase() === cleanName.toLowerCase());
       
       const price = typeof newProd.pricePerUnit === 'string' 
@@ -76,10 +68,10 @@ Devuelve exclusivamente el array JSON [ ... ].`;
       };
 
       if (index >= 0) {
-        updatedDatabase[index] = prodData; // Actualizamos el existente con los nuevos datos
+        updatedDatabase[index] = prodData;
         updatedCount++;
       } else {
-        updatedDatabase.push(prodData); // Añadimos como nuevo
+        updatedDatabase.push(prodData);
         addedCount++;
       }
     });
@@ -97,7 +89,7 @@ Devuelve exclusivamente el array JSON [ ... ].`;
         const importedList = JSON.parse(event.target?.result as string);
         if (!Array.isArray(importedList)) return alert('El JSON debe ser un array de productos.');
         const { addedCount, updatedCount } = processImportedList(importedList);
-        alert(`Importación JSON finalizada:\n- ${addedCount} nuevos\n- ${updatedCount} actualizados\nTotal catálogo: ${products.length + addedCount}`);
+        alert(`Importación JSON finalizada:\n- ${addedCount} nuevos\n- ${updatedCount} actualizados`);
       } catch (err) { alert('Error al procesar el archivo JSON.'); }
     };
     reader.readAsText(file);
@@ -113,24 +105,19 @@ Devuelve exclusivamente el array JSON [ ... ].`;
         const text = event.target?.result as string;
         const lines = text.split(/\r?\n/);
         const importedList: any[] = [];
-        
-        // Detectamos si la primera línea es cabecera
         const startLine = lines[0].toLowerCase().includes('nombre') || lines[0].toLowerCase().includes('iva') ? 1 : 0;
 
         for (let i = startLine; i < lines.length; i++) {
           const line = lines[i].trim();
           if (!line) continue;
-          
           const cols = line.split(';');
           if (cols.length < 3) continue;
-
           const allergensRaw = cols[3] || '';
           const allergens: Allergen[] = (allergensRaw === '-' || !allergensRaw)
             ? [] 
             : allergensRaw.split(',')
                 .map(a => mapCsvAllergen(a))
                 .filter((a): a is Allergen => a !== null);
-
           importedList.push({
             name: cols[0].trim(),
             pricePerUnit: cols[1].trim(),
@@ -139,12 +126,10 @@ Devuelve exclusivamente el array JSON [ ... ].`;
             category: 'Importado CSV'
           });
         }
-        
-        if (importedList.length === 0) return alert('No se encontraron datos válidos en el CSV.');
-        
+        if (importedList.length === 0) return alert('No se encontraron datos válidos.');
         const { addedCount, updatedCount } = processImportedList(importedList);
-        alert(`Importación CSV finalizada:\n- ${addedCount} nuevos\n- ${updatedCount} actualizados\nTotal catálogo: ${products.length + addedCount}`);
-      } catch (err) { alert('Error al procesar el archivo CSV. Verifica que el separador sea ";"'); }
+        alert(`Importación CSV finalizada:\n- ${addedCount} nuevos\n- ${updatedCount} actualizados`);
+      } catch (err) { alert('Error al procesar el archivo CSV.'); }
     };
     reader.readAsText(file);
     e.target.value = '';
@@ -173,8 +158,13 @@ Devuelve exclusivamente el array JSON [ ... ].`;
             <button onClick={onBack} className="p-2 hover:bg-gray-200 rounded-full transition-colors text-slate-600">
               <ArrowLeft size={24} />
             </button>
-            <div>
-              <h1 className="text-2xl font-black text-slate-800 tracking-tighter uppercase">Inventario Maestro</h1>
+            <div className="flex flex-col">
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-black text-slate-800 tracking-tighter uppercase">Inventario Maestro</h1>
+                <span className="bg-slate-900 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1 shadow-lg">
+                  <Database size={10} /> {products.length} Items
+                </span>
+              </div>
               <p className="text-slate-500 text-xs font-bold uppercase opacity-60">Control de Precios y Alérgenos</p>
             </div>
           </div>
@@ -199,9 +189,17 @@ Devuelve exclusivamente el array JSON [ ... ].`;
           </div>
         </div>
 
-        <div className="mb-6 relative max-w-md">
-           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-           <input type="text" placeholder="Filtrar catálogo..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl font-bold text-sm focus:ring-2 focus:ring-slate-900 transition-all" />
+        <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+           <div className="relative max-w-md w-full">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              <input type="text" placeholder="Filtrar catálogo..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl font-bold text-sm shadow-sm focus:ring-2 focus:ring-slate-900 transition-all" />
+           </div>
+           
+           {searchTerm && (
+             <div className="bg-amber-100 text-amber-800 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-amber-200 shadow-sm animate-fadeIn">
+               Mostrando {filteredProducts.length} de {products.length} resultados
+             </div>
+           )}
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
@@ -224,7 +222,7 @@ Devuelve exclusivamente el array JSON [ ... ].`;
                   </td>
                   <td className="px-6 py-4 font-black text-slate-800 uppercase tracking-tight">
                     {product.name}
-                    <div className="text-[10px] text-slate-400 font-bold opacity-60">{product.category}</div>
+                    <div className="text-[10px] text-slate-400 font-bold opacity-60 uppercase">{product.category}</div>
                   </td>
                   <td className="px-6 py-4 font-mono font-bold text-indigo-600">
                     {product.pricePerUnit.toFixed(3)}€
@@ -245,6 +243,16 @@ Devuelve exclusivamente el array JSON [ ... ].`;
                   </td>
                 </tr>
               ))}
+              {filteredProducts.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-6 py-20 text-center">
+                    <div className="flex flex-col items-center gap-3 text-slate-300">
+                      <Search size={48} className="opacity-10" />
+                      <p className="font-black uppercase tracking-widest text-xs">No se encontraron productos en el catálogo</p>
+                    </div>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -260,19 +268,19 @@ Devuelve exclusivamente el array JSON [ ... ].`;
             <form onSubmit={handleSave} className="p-8 space-y-6">
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Descripción Producto</label>
-                <input required type="text" value={editingProduct.name} onChange={e => setEditingProduct({...editingProduct, name: e.target.value})} className="w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-2xl font-bold uppercase" />
+                <input required type="text" value={editingProduct.name} onChange={e => setEditingProduct({...editingProduct, name: e.target.value})} className="w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-2xl font-bold uppercase outline-none focus:ring-2 focus:ring-slate-900" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Precio €/{editingProduct.unit}</label>
                   <div className="relative">
-                    <input type="number" step="any" value={editingProduct.pricePerUnit} onChange={e => setEditingProduct({...editingProduct, pricePerUnit: parseFloat(e.target.value) || 0})} className="w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-2xl font-mono font-bold" />
+                    <input type="number" step="any" value={editingProduct.pricePerUnit} onChange={e => setEditingProduct({...editingProduct, pricePerUnit: parseFloat(e.target.value) || 0})} className="w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-2xl font-mono font-bold outline-none focus:ring-2 focus:ring-slate-900" />
                     <DollarSign className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" size={16}/>
                   </div>
                 </div>
                 <div>
                   <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Unidad</label>
-                  <select value={editingProduct.unit} onChange={e => setEditingProduct({...editingProduct, unit: e.target.value})} className="w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-2xl font-bold">
+                  <select value={editingProduct.unit} onChange={e => setEditingProduct({...editingProduct, unit: e.target.value})} className="w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-slate-900">
                     <option value="kg">kg (Kilo)</option>
                     <option value="L">L (Litro)</option>
                     <option value="unidad">unidad</option>
