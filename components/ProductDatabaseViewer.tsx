@@ -29,20 +29,19 @@ export const ProductDatabaseViewer: React.FC<ProductDatabaseViewerProps> = ({
   }, [products, searchTerm]);
 
   const copyProductPrompt = () => {
-    const prompt = `Genera una lista de productos de cocina en formato JSON para mi catálogo de inventario. 
-Esquema: [ { "name": "Nombre exacto", "category": "carnes/verduras/pescados/almacen/etc", "unit": "kg/L/unidad", "pricePerUnit": 0.00, "allergens": [] } ]. 
-Importante: Los alérgenos deben ser de esta lista: Gluten, Crustáceos, Huevos, Pescado, Cacahuetes, Soja, Lácteos, Frutos de cáscara, Apio, Mostaza, Sésamo, Sulfitos, Altramuces, Moluscos.
-Genera 20 productos variados y realistas. Solo devuelve el array JSON.`;
+    const prompt = `ACTÚA COMO UN GENERADOR DE DATOS JSON PURO. NO ESCRIBAS EXPLICACIONES, NO USES BLOQUES DE CÓDIGO (\`\`\`).
+Genera una lista de productos en formato JSON.
+ESTRUCTURA: [ { "name": "Nombre", "category": "familia", "unit": "kg/L/unidad", "pricePerUnit": 0.00, "allergens": [] } ]
+REGLA DE ALÉRGENOS: Usa solo: Gluten, Crustáceos, Huevos, Pescado, Cacahuetes, Soja, Lácteos, Frutos de cáscara, Apio, Mostaza, Sésamo, Sulfitos, Altramuces, Moluscos.
+Devuelve exclusivamente el array JSON [ ... ].`;
     navigator.clipboard.writeText(prompt);
-    alert('Prompt de Inventario copiado. Pégalo en Gemini para obtener la lista JSON.');
+    alert('Prompt de Inventario copiado. Úsalo en Gemini para obtener el JSON directo.');
   };
 
   const mapCsvAllergen = (csvAllergen: string): Allergen | null => {
     const clean = csvAllergen.trim().toLowerCase();
     if (clean === 'leche') return 'Lácteos';
     if (clean === 'fruta de cascara' || clean === 'frutos de cascara') return 'Frutos de cáscara';
-    
-    // Buscar coincidencia en la lista oficial
     return ALLERGEN_LIST.find(a => a.toLowerCase() === clean) || null;
   };
 
@@ -91,8 +90,6 @@ Genera 20 productos variados y realistas. Solo devuelve el array JSON.`;
         const text = event.target?.result as string;
         const lines = text.split(/\r?\n/);
         const importedList: any[] = [];
-
-        // Ignoramos la cabecera si existe
         const startLine = lines[0].toLowerCase().includes('nombre') ? 1 : 0;
 
         for (let i = startLine; i < lines.length; i++) {
@@ -109,13 +106,12 @@ Genera 20 productos variados y realistas. Solo devuelve el array JSON.`;
 
           importedList.push({
             name: cols[0].trim(),
-            pricePerUnit: cols[1].trim(), // Se procesa en processImportedList
+            pricePerUnit: cols[1].trim(),
             unit: cols[2].trim(),
             allergens: allergens,
             category: 'Importado CSV'
           });
         }
-
         processImportedList(importedList);
         alert(`${importedList.length} productos procesados (CSV).`);
       } catch (err) { alert('Error al procesar el archivo CSV.'); }

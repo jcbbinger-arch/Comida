@@ -39,8 +39,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   );
 
   const copyRecipePrompt = () => {
-    const prompt = `Actúa como un Chef Ejecutivo y experto en costes. Genera un objeto JSON para una ficha técnica de la receta: [NOMBRE O LISTA DE INGREDIENTES]. 
-Usa estrictamente este esquema:
+    const prompt = `ACTÚA COMO UN GENERADOR DE DATOS JSON PURO. NO ESCRIBAS EXPLICACIONES, NO USES BLOQUES DE CÓDIGO (\`\`\`).
+Genera un objeto JSON para la receta: [NOMBRE O LISTA DE INGREDIENTES].
+ESTRUCTURA EXACTA REQUERIDA:
 {
   "name": "Nombre del Plato",
   "category": "Carnes/Pescados/Postres/etc",
@@ -49,11 +50,11 @@ Usa estrictamente este esquema:
   "creator": "${settings.teacherName}",
   "subRecipes": [
     {
-      "name": "Nombre de la elaboración",
+      "name": "Base o Elaboración Principal",
       "ingredients": [
         { "name": "Ingrediente", "quantity": "0.500", "unit": "kg", "allergens": ["Gluten"] }
       ],
-      "instructions": "Pasos detallados..."
+      "instructions": "Pasos técnicos detallados..."
     }
   ],
   "platingInstructions": "Instrucciones de montaje...",
@@ -61,13 +62,13 @@ Usa estrictamente este esquema:
     "serviceType": "Servicio a la Americana",
     "cutlery": "Tenedor y cuchillo...",
     "servingTemp": "70ºC",
-    "clientDescription": "Descripción sugerente para la carta..."
+    "clientDescription": "Descripción sugerente..."
   }
 }
-Importante: Las cantidades siempre en formato string con puntos para decimales. No añadas texto fuera del JSON.`;
+IMPORTANTE: Devuelve únicamente el objeto entre llaves { ... }. No incluyas nada más.`;
     
     navigator.clipboard.writeText(prompt);
-    alert('Prompt de Receta copiado. Pégalo en Gemini para generar tu ficha técnica.');
+    alert('Prompt Maestro de Receta copiado. Pégalo en Gemini para obtener el JSON directo.');
   };
 
   const handleImportClick = () => fileInputRef.current?.click();
@@ -204,7 +205,6 @@ Importante: Las cantidades siempre en formato string con puntos para decimales. 
                       }} className="p-2.5 bg-white text-slate-600 hover:text-slate-900 rounded-xl shadow-sm transition-all"><Download size={18} /></button>
                   </div>
                   <div className="flex gap-1">
-                    {/* Fixed handleEdit typo to onEdit prop */}
                     <button onClick={() => onEdit(recipe)} className="p-2.5 bg-white text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl shadow-sm transition-all"><Edit2 size={18} /></button>
                     <button onClick={() => confirm(`¿Borrar ficha técnica de ${recipe.name}?`) && onDelete(recipe.id)} className="p-2.5 bg-white text-red-500 hover:bg-red-500 hover:text-white rounded-xl shadow-sm transition-all"><Trash2 size={18} /></button>
                   </div>
