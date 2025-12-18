@@ -43,10 +43,10 @@ export const RecipeEditor: React.FC<RecipeEditorProps> = ({
   const [subRecipes, setSubRecipes] = useState<SubRecipe[]>([]);
   const [activeTab, setActiveTab] = useState<number>(0);
   const [suggestions, setSuggestions] = useState<{idx: number, list: Product[]} | null>(null);
-  const [editingAllergens, setEditingAllergens] = useState<{subIndex: number, ingIndex: number} | null>(null);
   const [showSmartImport, setShowSmartImport] = useState(false);
   const [importText, setImportText] = useState('');
   
+  // Estado para alta rápida de producto
   const [quickAdd, setQuickAdd] = useState<{subIdx: number, ingIdx: number, product: Product} | null>(null);
 
   useEffect(() => {
@@ -178,6 +178,18 @@ export const RecipeEditor: React.FC<RecipeEditorProps> = ({
     });
   };
 
+  const toggleQuickAddAllergen = (allergen: Allergen) => {
+    if (!quickAdd) return;
+    const current = quickAdd.product.allergens || [];
+    const updated = current.includes(allergen) 
+      ? current.filter(a => a !== allergen) 
+      : [...current, allergen];
+    setQuickAdd({
+      ...quickAdd,
+      product: { ...quickAdd.product, allergens: updated }
+    });
+  };
+
   const confirmQuickAdd = () => {
     if (!quickAdd) return;
     onAddProduct(quickAdd.product);
@@ -238,9 +250,10 @@ export const RecipeEditor: React.FC<RecipeEditorProps> = ({
         </div>
       )}
 
+      {/* Modal Alta Express de Producto - ACTUALIZADO CON ALÉRGENOS */}
       {quickAdd && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/90 backdrop-blur-sm p-4 animate-fadeIn">
-          <div className="bg-white rounded-[2rem] shadow-2xl max-w-md w-full overflow-hidden">
+          <div className="bg-white rounded-[2rem] shadow-2xl max-w-lg w-full overflow-hidden">
             <div className="bg-amber-500 text-slate-900 px-8 py-6 flex justify-between items-center">
               <div>
                 <h2 className="text-lg font-black uppercase tracking-tighter flex items-center gap-2"><Database size={20}/> Alta Express de Inventario</h2>
@@ -248,7 +261,7 @@ export const RecipeEditor: React.FC<RecipeEditorProps> = ({
               </div>
               <button onClick={() => setQuickAdd(null)} className="hover:rotate-90 transition-transform"><X size={24}/></button>
             </div>
-            <div className="p-8 space-y-5">
+            <div className="p-8 space-y-5 max-h-[80vh] overflow-y-auto custom-scrollbar">
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Nombre del Género</label>
                 <input type="text" value={quickAdd.product.name} onChange={e => setQuickAdd({...quickAdd, product: {...quickAdd.product, name: e.target.value.toUpperCase()}})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold uppercase outline-none focus:ring-2 focus:ring-amber-500" />
@@ -277,8 +290,26 @@ export const RecipeEditor: React.FC<RecipeEditorProps> = ({
                    <option value="Lácteos">Lácteos</option>
                 </select>
               </div>
-              <button onClick={confirmQuickAdd} className="w-full bg-slate-900 text-white py-4 rounded-xl font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl">
-                 Vincular y Guardar
+
+              {/* Selector de Alérgenos añadido */}
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest flex items-center gap-2">
+                   <Shield size={12} className="text-red-500"/> Declaración de Alérgenos
+                </label>
+                <div className="grid grid-cols-3 gap-2 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                  {ALLERGEN_LIST.map(a => {
+                    const isSel = quickAdd.product.allergens.includes(a);
+                    return (
+                      <button key={a} type="button" onClick={() => toggleQuickAddAllergen(a)} className={`px-2 py-2 rounded-xl text-[9px] font-black border transition-all uppercase ${isSel ? 'bg-red-50 border-red-500 text-red-700 shadow-sm' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-300'}`}>
+                        {a.substring(0,3)} {isSel && '✓'}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <button onClick={confirmQuickAdd} className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl mt-4">
+                 Vincular y Guardar en Maestro
               </button>
             </div>
           </div>
