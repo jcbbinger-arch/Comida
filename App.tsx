@@ -1,6 +1,5 @@
-
-import React, { useState } from 'react';
-import { Recipe, AppSettings, AppBackup, Product } from './types';
+import React, { useState, useEffect } from 'react';
+import { Recipe, AppSettings, AppBackup, Product, DEFAULT_CATEGORIES } from './types';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { Dashboard } from './components/Dashboard';
 import { RecipeEditor } from './components/RecipeEditor';
@@ -17,7 +16,8 @@ const defaultSettings: AppSettings = {
   teacherName: "Juan Codina Barranco",
   instituteName: "IES La Flota",
   teacherLogo: "",
-  instituteLogo: ""
+  instituteLogo: "",
+  categories: DEFAULT_CATEGORIES
 };
 
 function App() {
@@ -25,154 +25,28 @@ function App() {
   const [settings, setSettings] = useLocalStorage<AppSettings>('appSettings', defaultSettings);
   const [productDatabase, setProductDatabase] = useLocalStorage<Product[]>('productDatabase', INITIAL_PRODUCT_DATABASE);
   
-  // Initial state set to LANDING
   const [viewState, setViewState] = useState<ViewState>('LANDING');
   const [currentRecipe, setCurrentRecipe] = useState<Recipe | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-  // --- Actions ---
-
-  const handleEnterApp = () => {
-    setViewState('DASHBOARD');
-  };
-
-  const handleLogout = () => {
-    setViewState('LANDING');
-    setCurrentRecipe(null);
-  };
-
-  const handleCreateNew = () => {
-    setCurrentRecipe(null);
-    setViewState('EDITOR');
-  };
-
-  const handleEdit = (recipe: Recipe) => {
-    // Check if recipe needs migration in memory before editing
-    const preparedRecipe = migrateRecipeIfNeeded(recipe);
-    setCurrentRecipe(preparedRecipe);
-    setViewState('EDITOR');
-  };
-
-  const handleView = (recipe: Recipe) => {
-    const preparedRecipe = migrateRecipeIfNeeded(recipe);
-    setCurrentRecipe(preparedRecipe);
-    setViewState('VIEWER');
-  };
-
-  const handleDelete = (id: string) => {
-    setRecipes(prev => prev.filter(r => r.id !== id));
-    if (currentRecipe?.id === id) {
-      setViewState('DASHBOARD');
-      setCurrentRecipe(null);
+  // Asegurar que las categorías dinámicas existan
+  useEffect(() => {
+    if (!settings.categories || settings.categories.length === 0) {
+      setSettings(prev => ({ ...prev, categories: DEFAULT_CATEGORIES }));
     }
-  };
+  }, [settings.categories, setSettings]);
 
-  const handleSave = (recipe: Recipe) => {
-    // 1. Save the Recipe
-    setRecipes(prev => {
-      const exists = prev.find(r => r.id === recipe.id);
-      if (exists) {
-        return prev.map(r => r.id === recipe.id ? recipe : r);
-      } else {
-        return [recipe, ...prev];
-      }
-    });
+  const handleEnterApp = () => setViewState('DASHBOARD');
+  const handleLogout = () => { setViewState('LANDING'); setCurrentRecipe(null); };
 
-    // 2. Auto-Learn New Ingredients
-    const newProducts: Product[] = [];
-    const existingNames = new Set(productDatabase.map(p => p.name.trim().toLowerCase()));
+  const handleCreateNew = () => { setCurrentRecipe(null); setViewState('EDITOR'); };
 
-    recipe.subRecipes.forEach(sub => {
-      sub.ingredients.forEach(ing => {
-        const normalizedName = ing.name.trim();
-        if (normalizedName && !existingNames.has(normalizedName.toLowerCase())) {
-          const alreadyAdded = newProducts.find(p => p.name.toLowerCase() === normalizedName.toLowerCase());
-          
-          if (!alreadyAdded) {
-            newProducts.push({
-              id: `custom_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-              name: normalizedName,
-              category: 'Otros',
-              unit: ing.unit || 'kg',
-              allergens: ing.allergens || []
-            });
-            existingNames.add(normalizedName.toLowerCase());
-          }
-        }
-      });
-    });
-
-    if (newProducts.length > 0) {
-      setProductDatabase(prev => [...prev, ...newProducts]);
-    }
-
-    setViewState('DASHBOARD');
-    setCurrentRecipe(null);
-  };
-
-  // --- Product Database CRUD Actions ---
-
-  const handleProductAdd = (newProduct: Product) => {
-    setProductDatabase(prev => [newProduct, ...prev]);
-  };
-
-  const handleProductEdit = (updatedProduct: Product) => {
-    setProductDatabase(prev => prev.map(p => p.id === updatedProduct.id ? updatedProduct : p));
-  };
-
-  const handleProductDelete = (id: string) => {
-    setProductDatabase(prev => prev.filter(p => p.id !== id));
-  };
-
-  const handleProductDatabaseImport = (importedProducts: Product[]) => {
-    setProductDatabase(prev => {
-      const currentMap = new Map(prev.map(p => [p.id, p]));
-      let addedCount = 0;
-      let updatedCount = 0;
-
-      importedProducts.forEach(p => {
-        if (p.id && p.name) {
-          if (currentMap.has(p.id)) {
-            updatedCount++;
-          } else {
-            addedCount++;
-          }
-          currentMap.set(p.id, p);
-        }
-      });
-
-      alert(`Base de datos actualizada:\n- ${addedCount} productos nuevos\n- ${updatedCount} productos actualizados`);
-      return Array.from(currentMap.values());
-    });
-  };
-
-  const handleImport = (recipe: Recipe) => {
-     const migrated = migrateRecipeIfNeeded(recipe);
-     migrated.id = Date.now().toString(); 
-     setRecipes(prev => [migrated, ...prev]);
-  };
-
-  const handleBackToDashboard = () => {
-    setViewState('DASHBOARD');
-    setCurrentRecipe(null);
-  };
-
-  const handleRestoreBackup = (backup: AppBackup) => {
-    setRecipes(backup.recipes);
-    setSettings(backup.settings);
-    if (backup.productDatabase && backup.productDatabase.length > 0) {
-      setProductDatabase(backup.productDatabase);
-    }
-    alert('Copia de seguridad restaurada correctamente.');
-  };
-
-  // Function to migrate legacy recipes with single ingredients/instructions to the new subRecipes format
   const migrateRecipeIfNeeded = (r: Recipe): Recipe => {
-    // Cast to any to access legacy properties during migration that are no longer in the Recipe interface
     const legacy = r as any;
     if (legacy.subRecipes && legacy.subRecipes.length > 0) return r;
     return {
       ...r,
+      creator: legacy.creator || settings.teacherName,
       subRecipes: [{
         id: 'legacy-1',
         name: 'Elaboración Principal',
@@ -184,6 +58,25 @@ function App() {
     };
   };
 
+  const handleEdit = (recipe: Recipe) => {
+    setCurrentRecipe(migrateRecipeIfNeeded(recipe));
+    setViewState('EDITOR');
+  };
+
+  const handleView = (recipe: Recipe) => {
+    setCurrentRecipe(migrateRecipeIfNeeded(recipe));
+    setViewState('VIEWER');
+  };
+
+  const handleSave = (recipe: Recipe) => {
+    setRecipes(prev => {
+      const exists = prev.find(r => r.id === recipe.id);
+      return exists ? prev.map(r => r.id === recipe.id ? recipe : r) : [recipe, ...prev];
+    });
+    setViewState('DASHBOARD');
+    setCurrentRecipe(null);
+  };
+
   return (
     <>
       <SettingsModal 
@@ -193,56 +86,26 @@ function App() {
         recipes={recipes}
         productDatabase={productDatabase}
         onSave={setSettings}
-        onRestore={handleRestoreBackup}
+        onRestore={(backup) => {
+          setRecipes(backup.recipes);
+          setSettings(backup.settings);
+          if (backup.productDatabase) setProductDatabase(backup.productDatabase);
+          alert('Copia de seguridad restaurada correctamente.');
+        }}
       />
 
       {viewState === 'LANDING' ? (
-        <LandingPage 
-          settings={settings} 
-          onEnter={handleEnterApp} 
-        />
+        <LandingPage settings={settings} onEnter={handleEnterApp} />
       ) : viewState === 'VIEWER' && currentRecipe ? (
-        <RecipeView 
-          recipe={currentRecipe} 
-          onBack={handleBackToDashboard} 
-          settings={settings}
-        />
+        <RecipeView recipe={currentRecipe} onBack={() => setViewState('DASHBOARD')} settings={settings} />
       ) : viewState === 'EDITOR' ? (
-        <RecipeEditor 
-          initialRecipe={currentRecipe} 
-          productDatabase={productDatabase}
-          onSave={handleSave} 
-          onCancel={handleBackToDashboard} 
-        />
+        <RecipeEditor initialRecipe={currentRecipe} productDatabase={productDatabase} settings={settings} onSave={handleSave} onCancel={() => setViewState('DASHBOARD')} />
       ) : viewState === 'MENU_PLANNER' ? (
-        <MenuPlanner
-          recipes={recipes}
-          settings={settings}
-          onBack={handleBackToDashboard}
-        />
+        <MenuPlanner recipes={recipes} settings={settings} onBack={() => setViewState('DASHBOARD')} productDatabase={productDatabase} />
       ) : viewState === 'PRODUCT_DB' ? (
-        <ProductDatabaseViewer
-          products={productDatabase}
-          onBack={handleBackToDashboard}
-          onAdd={handleProductAdd}
-          onEdit={handleProductEdit}
-          onDelete={handleProductDelete}
-          onImport={handleProductDatabaseImport}
-        />
+        <ProductDatabaseViewer products={productDatabase} onBack={() => setViewState('DASHBOARD')} onAdd={(p) => setProductDatabase([p, ...productDatabase])} onEdit={(p) => setProductDatabase(productDatabase.map(old => old.id === p.id ? p : old))} onDelete={(id) => setProductDatabase(productDatabase.filter(p => p.id !== id))} onImport={(list) => setProductDatabase([...list])} />
       ) : (
-        <Dashboard 
-          recipes={recipes} 
-          settings={settings}
-          onNew={handleCreateNew}
-          onEdit={handleEdit}
-          onView={handleView}
-          onDelete={handleDelete}
-          onImport={handleImport}
-          onOpenSettings={() => setIsSettingsOpen(true)}
-          onOpenMenuPlanner={() => setViewState('MENU_PLANNER')}
-          onOpenProductDB={() => setViewState('PRODUCT_DB')}
-          onLogout={handleLogout}
-        />
+        <Dashboard recipes={recipes} settings={settings} onNew={handleCreateNew} onEdit={handleEdit} onView={handleView} onDelete={(id) => setRecipes(recipes.filter(r => r.id !== id))} onImport={(r) => setRecipes([r, ...recipes])} onOpenSettings={() => setIsSettingsOpen(true)} onOpenMenuPlanner={() => setViewState('MENU_PLANNER')} onOpenProductDB={() => setViewState('PRODUCT_DB')} onLogout={handleLogout} />
       )}
     </>
   );
