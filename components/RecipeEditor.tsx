@@ -3,7 +3,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Recipe, Ingredient, ServiceDetails, SubRecipe, 
   Allergen, ALLERGEN_LIST, Product, 
-  // Fix: Renamed CUT_LIFE_DICTIONARY to CUTLERY_DICTIONARY as it's the correct export from ../types
   CUTLERY_DICTIONARY, SERVICE_TYPES, TEMPERATURE_DICTIONARY, AppSettings 
 } from '../types';
 import { 
@@ -264,7 +263,7 @@ export const RecipeEditor: React.FC<RecipeEditorProps> = ({ initialRecipe, produ
              </div>
 
              {subRecipes[activeTab] && (
-               <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm space-y-6 animate-fadeIn">
+               <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm space-y-6 animate-fadeIn overflow-visible">
                   <div className="flex justify-between items-center border-b pb-4">
                     <input type="text" value={subRecipes[activeTab].name} onChange={e => {
                       const n = [...subRecipes]; n[activeTab].name = e.target.value; setSubRecipes(n);
@@ -281,41 +280,45 @@ export const RecipeEditor: React.FC<RecipeEditorProps> = ({ initialRecipe, produ
                          const n = [...subRecipes]; n[activeTab].ingredients.push({ id: Math.random().toString(), name: '', quantity: '', unit: 'kg', allergens: [] }); setSubRecipes(n);
                        }} className="text-indigo-600 flex items-center gap-1"><Plus size={14}/> Añadir</button>
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-2 relative">
                       {subRecipes[activeTab].ingredients.map((ing, iIdx) => {
                         const inDB = isIngredientInDB(ing.name);
+                        const isActiveSuggestion = suggestions && suggestions.idx === iIdx;
                         return (
-                          <div key={ing.id} className={`grid grid-cols-12 gap-2 p-2 rounded-xl border transition-all ${inDB ? 'bg-slate-50 border-slate-100' : 'bg-amber-50 border-amber-200 animate-pulse'}`}>
+                          <div key={ing.id} className={`grid grid-cols-12 gap-2 p-2 rounded-xl border transition-all relative ${isActiveSuggestion ? 'z-50 shadow-lg ring-2 ring-indigo-500' : 'z-auto'} ${inDB ? 'bg-slate-50 border-slate-100' : 'bg-amber-50 border-amber-200'}`}>
                              <div className="col-span-6 relative flex items-center gap-2">
                                 {!inDB && ing.name && <AlertTriangle size={16} className="text-amber-500 shrink-0" title="No vinculado al inventario (Coste 0€)" />}
                                 <input type="text" value={ing.name} onChange={e => updateIngredient(activeTab, iIdx, 'name', e.target.value)} className="w-full bg-transparent px-2 py-1 text-sm font-bold outline-none uppercase" placeholder="Ingrediente..." />
-                                {suggestions && suggestions.idx === iIdx && (
-                                  <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-slate-200 shadow-2xl rounded-xl overflow-hidden max-h-40 overflow-y-auto">
+                                
+                                {isActiveSuggestion && (
+                                  <div className="absolute z-[100] left-0 right-0 top-full mt-2 bg-white border border-slate-200 shadow-[0_20px_50px_rgba(0,0,0,0.2)] rounded-2xl overflow-hidden max-h-60 overflow-y-auto animate-fadeIn ring-1 ring-slate-900/5">
+                                     <div className="bg-slate-50 px-4 py-2 border-b border-slate-100 text-[9px] font-black text-slate-400 uppercase tracking-widest">Coincidencias en Inventario</div>
                                      {suggestions.list.map(p => (
-                                       <div key={p.id} onClick={() => selectProduct(activeTab, iIdx, p)} className="px-4 py-2 hover:bg-slate-50 cursor-pointer text-[10px] flex justify-between font-bold uppercase">
-                                          <span>{p.name}</span> <span className="text-indigo-600">{p.pricePerUnit.toFixed(2)}€</span>
+                                       <div key={p.id} onClick={() => selectProduct(activeTab, iIdx, p)} className="px-4 py-3 hover:bg-indigo-50 cursor-pointer text-[10px] flex justify-between font-bold uppercase transition-colors group">
+                                          <span className="group-hover:text-indigo-600">{p.name}</span> 
+                                          <span className="text-indigo-600 font-mono">{p.pricePerUnit.toFixed(2)}€/{p.unit}</span>
                                        </div>
                                      ))}
                                   </div>
                                 )}
                              </div>
-                             <input type="text" value={ing.quantity} onChange={e => updateIngredient(activeTab, iIdx, 'quantity', e.target.value)} className="col-span-2 text-right px-2 py-1 bg-white border rounded-lg text-sm font-mono" placeholder="0.00" />
+                             <input type="text" value={ing.quantity} onChange={e => updateIngredient(activeTab, iIdx, 'quantity', e.target.value)} className="col-span-2 text-right px-2 py-1 bg-white border border-slate-100 rounded-lg text-sm font-mono focus:border-indigo-500 outline-none" placeholder="0.00" />
                              <span className="col-span-1 text-[9px] font-black text-slate-400 uppercase flex items-center">{ing.unit}</span>
                              <span className="col-span-2 text-right font-mono font-black text-indigo-600 text-xs flex items-center justify-end">{ing.cost?.toFixed(2)}€</span>
                              <button onClick={() => {
                                const n = [...subRecipes]; n[activeTab].ingredients.splice(iIdx, 1); setSubRecipes(n);
-                             }} className="col-span-1 text-slate-300 hover:text-red-500 flex justify-center items-center"><Trash2 size={16}/></button>
+                             }} className="col-span-1 text-slate-300 hover:text-red-500 flex justify-center items-center transition-colors"><Trash2 size={16}/></button>
                           </div>
                         );
                       })}
                     </div>
                   </div>
 
-                  <div className="pt-4 border-t">
-                     <label className="block text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest">Procedimiento</label>
+                  <div className="pt-4 border-t border-slate-100">
+                     <label className="block text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest">Procedimiento Técnico</label>
                      <textarea value={subRecipes[activeTab].instructions} onChange={e => {
                        const n = [...subRecipes]; n[activeTab].instructions = e.target.value; setSubRecipes(n);
-                     }} className="w-full p-5 bg-slate-50 border border-slate-100 rounded-2xl text-sm min-h-[200px] outline-none" placeholder="Escribe el proceso técnico..." />
+                     }} className="w-full p-5 bg-slate-50 border border-slate-100 rounded-2xl text-sm min-h-[200px] outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all" placeholder="Escribe el proceso paso a paso..." />
                   </div>
                </div>
              )}
@@ -327,24 +330,24 @@ export const RecipeEditor: React.FC<RecipeEditorProps> = ({ initialRecipe, produ
                 <div className="space-y-4">
                    <div>
                       <label className="block text-[9px] font-black text-slate-500 uppercase mb-2">Servicio</label>
-                      <select value={serviceDetails.serviceType} onChange={e => setServiceDetails({...serviceDetails, serviceType: e.target.value})} className="w-full bg-slate-800 border-none rounded-xl px-4 py-3 text-xs">
+                      <select value={serviceDetails.serviceType} onChange={e => setServiceDetails({...serviceDetails, serviceType: e.target.value})} className="w-full bg-slate-800 border-none rounded-xl px-4 py-3 text-xs outline-none focus:ring-2 focus:ring-amber-500">
                          {SERVICE_TYPES.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
                       </select>
                    </div>
                    <div>
                       <label className="block text-[9px] font-black text-slate-500 uppercase mb-2">Marcaje / Cubiertos</label>
-                      <textarea value={serviceDetails.cutlery} onChange={e => setServiceDetails({...serviceDetails, cutlery: e.target.value})} className="w-full bg-slate-800 border-none rounded-xl px-4 py-3 text-xs min-h-[60px]" placeholder="Ej: Cubierto de pescado..." />
+                      <textarea value={serviceDetails.cutlery} onChange={e => setServiceDetails({...serviceDetails, cutlery: e.target.value})} className="w-full bg-slate-800 border-none rounded-xl px-4 py-3 text-xs min-h-[60px] outline-none" placeholder="Ej: Cubierto de pescado..." />
                    </div>
                    <div>
-                      <label className="block text-[9px] font-black text-slate-500 uppercase mb-2">Temperatura</label>
-                      <input type="text" value={serviceDetails.servingTemp} onChange={e => setServiceDetails({...serviceDetails, servingTemp: e.target.value})} className="w-full bg-slate-800 border-none rounded-xl px-4 py-3 text-xs" placeholder="Ej: 75ºC" />
+                      <label className="block text-[9px] font-black text-slate-500 uppercase mb-2">Temperatura Pase</label>
+                      <input type="text" value={serviceDetails.servingTemp} onChange={e => setServiceDetails({...serviceDetails, servingTemp: e.target.value})} className="w-full bg-slate-800 border-none rounded-xl px-4 py-3 text-xs outline-none" placeholder="Ej: 75ºC" />
                    </div>
                 </div>
              </div>
 
              <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm space-y-4">
-                <h4 className="font-black uppercase tracking-widest text-[10px] text-slate-400">Montaje Final</h4>
-                <textarea value={platingInstructions} onChange={e => setPlatingInstructions(e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm min-h-[100px]" placeholder="Instrucciones de emplatado..." />
+                <h4 className="font-black uppercase tracking-widest text-[10px] text-slate-400 border-b border-slate-50 pb-2">Montaje y Emplatado</h4>
+                <textarea value={platingInstructions} onChange={e => setPlatingInstructions(e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm min-h-[120px] outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all" placeholder="Describe el montaje final..." />
              </div>
           </div>
         </div>
