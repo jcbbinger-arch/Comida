@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { AppSettings, AppBackup, Recipe, Product } from '../types';
-import { X, Save, Upload, School, User, Database, Download, Tag, Plus, Trash2 } from 'lucide-react';
+import { X, Save, Upload, School, User, Database, Download, Tag, Plus, Trash2, Edit3 } from 'lucide-react';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -70,11 +71,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
     }
   };
 
+  const updateCategory = (index: number, newName: string) => {
+    const updated = [...localSettings.categories];
+    updated[index] = newName;
+    setLocalSettings({ ...localSettings, categories: updated });
+  };
+
   const removeCategory = (cat: string) => {
-    setLocalSettings({
-      ...localSettings,
-      categories: localSettings.categories.filter(c => c !== cat)
-    });
+    if (confirm(`¿Eliminar la categoría "${cat}"?`)) {
+      setLocalSettings({
+        ...localSettings,
+        categories: localSettings.categories.filter(c => c !== cat)
+      });
+    }
   };
 
   return (
@@ -118,15 +127,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
                 <Tag size={18} className="text-indigo-500" /> Gestión de Categorías
              </div>
              <div className="space-y-4">
-                <div className="flex gap-2">
+                <div className="flex gap-2 mb-4">
                    <input type="text" value={newCat} onChange={e => setNewCat(e.target.value)} className="flex-grow px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Nueva categoría..." />
-                   <button onClick={addCategory} className="bg-slate-900 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2"><Plus size={16}/> Añadir</button>
+                   <button onClick={addCategory} className="bg-slate-900 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition-all hover:bg-slate-800"><Plus size={16}/> Añadir</button>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                   {localSettings.categories?.map(c => (
-                     <div key={c} className="bg-slate-100 px-3 py-1 rounded-full flex items-center gap-2 border border-slate-200 shadow-sm">
-                        <span className="text-xs font-bold text-slate-700">{c}</span>
-                        <button onClick={() => removeCategory(c)} className="text-red-400 hover:text-red-600"><Trash2 size={14}/></button>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                   {localSettings.categories?.map((c, idx) => (
+                     <div key={idx} className="bg-slate-50 px-3 py-2 rounded-xl flex items-center gap-2 border border-slate-200 group">
+                        <input 
+                          type="text" 
+                          value={c} 
+                          onChange={(e) => updateCategory(idx, e.target.value)} 
+                          className="bg-transparent border-none text-xs font-bold text-slate-700 flex-grow focus:ring-0 p-0"
+                        />
+                        <button onClick={() => removeCategory(c)} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={14}/></button>
                      </div>
                    ))}
                 </div>
