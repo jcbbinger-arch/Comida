@@ -1,7 +1,13 @@
-
 import React, { useState, useEffect } from 'react';
-import { Recipe, Ingredient, ServiceDetails, SubRecipe, CATEGORIES, Allergen, ALLERGEN_LIST, Product } from '../types';
-import { Save, X, Plus, Trash2, Image as ImageIcon, Upload, Layers, AlertTriangle, Shield, Check } from 'lucide-react';
+import { 
+  Recipe, Ingredient, ServiceDetails, SubRecipe, 
+  CATEGORIES, Allergen, ALLERGEN_LIST, Product, 
+  CUTLERY_DICTIONARY, SERVICE_TYPES, TEMPERATURE_DICTIONARY 
+} from '../types';
+import { 
+  Save, X, Plus, Trash2, Image as ImageIcon, 
+  Layers, Shield, Check, Book, Utensils, Thermometer, Info, ChevronDown, ChevronUp
+} from 'lucide-react';
 
 interface RecipeEditorProps {
   initialRecipe?: Recipe | null;
@@ -15,12 +21,11 @@ const emptyServiceDetails: ServiceDetails = {
   servingTemp: '',
   cutlery: '',
   passTime: '',
-  serviceType: '',
+  serviceType: 'Servicio a la Americana',
   clientDescription: ''
 };
 
 export const RecipeEditor: React.FC<RecipeEditorProps> = ({ initialRecipe, productDatabase, onSave, onCancel }) => {
-  // Main Recipe State
   const [name, setName] = useState('');
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [yieldQuantity, setYieldQuantity] = useState<number>(1);
@@ -28,16 +33,13 @@ export const RecipeEditor: React.FC<RecipeEditorProps> = ({ initialRecipe, produ
   const [photo, setPhoto] = useState('');
   const [platingInstructions, setPlatingInstructions] = useState('');
   const [serviceDetails, setServiceDetails] = useState<ServiceDetails>(emptyServiceDetails);
-  
-  // SubRecipes State
   const [subRecipes, setSubRecipes] = useState<SubRecipe[]>([]);
   const [activeTab, setActiveTab] = useState<number>(0);
-
-  // Helper for suggestions
   const [suggestions, setSuggestions] = useState<{idx: number, list: Product[]} | null>(null);
-
-  // Allergen Modal State
   const [editingAllergens, setEditingAllergens] = useState<{subIndex: number, ingIndex: number} | null>(null);
+
+  // Estados para colapsables del diccionario
+  const [openDict, setOpenDict] = useState<'none' | 'cutlery' | 'temp' | 'service'>('none');
 
   useEffect(() => {
     if (initialRecipe) {
@@ -46,25 +48,10 @@ export const RecipeEditor: React.FC<RecipeEditorProps> = ({ initialRecipe, produ
       setYieldQuantity(initialRecipe.yieldQuantity);
       setYieldUnit(initialRecipe.yieldUnit);
       setPhoto(initialRecipe.photo);
-      setServiceDetails(initialRecipe.serviceDetails);
-      
-      // Handle Migration from old structure to new SubRecipe structure
-      if (initialRecipe.subRecipes && initialRecipe.subRecipes.length > 0) {
-        setSubRecipes(initialRecipe.subRecipes);
-        setPlatingInstructions(initialRecipe.platingInstructions || '');
-      } else {
-        // Migration: Create one sub-recipe from the old data
-        setSubRecipes([{
-          id: Date.now().toString(),
-          name: 'Elaboración Principal',
-          ingredients: initialRecipe.ingredients || [],
-          instructions: initialRecipe.instructions || '',
-          photo: ''
-        }]);
-        setPlatingInstructions('');
-      }
+      setServiceDetails(initialRecipe.serviceDetails || emptyServiceDetails);
+      setPlatingInstructions(initialRecipe.platingInstructions || '');
+      setSubRecipes(initialRecipe.subRecipes || []);
     } else {
-      // New Recipe default state
       setSubRecipes([{
         id: Date.now().toString(),
         name: 'Elaboración Principal',
@@ -80,9 +67,8 @@ export const RecipeEditor: React.FC<RecipeEditorProps> = ({ initialRecipe, produ
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        if (isMain) {
-          setPhoto(reader.result as string);
-        } else if (subRecipeIndex !== undefined) {
+        if (isMain) setPhoto(reader.result as string);
+        else if (subRecipeIndex !== undefined) {
           const newSubs = [...subRecipes];
           newSubs[subRecipeIndex].photo = reader.result as string;
           setSubRecipes(newSubs);
@@ -92,577 +78,377 @@ export const RecipeEditor: React.FC<RecipeEditorProps> = ({ initialRecipe, produ
     }
   };
 
-  // --- SubRecipe Management ---
-
   const addSubRecipe = () => {
-    setSubRecipes([
-      ...subRecipes, 
-      { 
-        id: Date.now().toString(), 
-        name: `Nueva Elaboración ${subRecipes.length + 1}`, 
-        ingredients: [], 
-        instructions: '', 
-        photo: '' 
-      }
-    ]);
+    const newSub = { 
+      id: Date.now().toString(), 
+      name: `Nueva Elaboración`, 
+      ingredients: [], 
+      instructions: '', 
+      photo: '' 
+    };
+    setSubRecipes([...subRecipes, newSub]);
     setActiveTab(subRecipes.length);
   };
 
   const removeSubRecipe = (index: number) => {
-    if (subRecipes.length === 1) {
-      alert("Debe haber al menos una elaboración.");
-      return;
+    if (subRecipes.length === 1) return alert("Mínimo 1 elaboración.");
+    if (confirm("¿Eliminar esta elaboración por completo?")) {
+      setSubRecipes(subRecipes.filter((_, i) => i !== index));
+      setActiveTab(Math.max(0, activeTab - 1));
     }
-    const newSubs = subRecipes.filter((_, i) => i !== index);
-    setSubRecipes(newSubs);
-    setActiveTab(Math.max(0, activeTab - 1));
   };
 
-  const updateSubRecipeName = (index: number, name: string) => {
+  const updateSubRecipe = (idx: number, field: keyof SubRecipe, value: any) => {
     const newSubs = [...subRecipes];
-    newSubs[index].name = name;
+    newSubs[idx] = { ...newSubs[idx], [field]: value };
     setSubRecipes(newSubs);
   };
 
-  const updateSubRecipeInstructions = (index: number, text: string) => {
+  const updateIngredient = (subIdx: number, ingIdx: number, field: keyof Ingredient, value: any) => {
     const newSubs = [...subRecipes];
-    newSubs[index].instructions = text;
-    setSubRecipes(newSubs);
-  };
-
-  // --- Ingredient Management & Autocomplete ---
-
-  const addIngredient = (subIndex: number) => {
-    const newSubs = [...subRecipes];
-    newSubs[subIndex].ingredients.push({ 
-      id: Date.now().toString(), 
-      name: '', 
-      quantity: '', 
-      unit: '',
-      allergens: [] 
-    });
-    setSubRecipes(newSubs);
-  };
-
-  const removeIngredient = (subIndex: number, ingIndex: number) => {
-    const newSubs = [...subRecipes];
-    newSubs[subIndex].ingredients.splice(ingIndex, 1);
-    setSubRecipes(newSubs);
-  };
-
-  const updateIngredient = (subIndex: number, ingIndex: number, field: keyof Ingredient, value: any) => {
-    const newSubs = [...subRecipes];
-    newSubs[subIndex].ingredients[ingIndex] = { 
-      ...newSubs[subIndex].ingredients[ingIndex], 
+    newSubs[subIdx].ingredients[ingIdx] = { 
+      ...newSubs[subIdx].ingredients[ingIdx], 
       [field]: value 
     };
-
-    // Auto-detect allergens if name changes
     if (field === 'name') {
       const lowerVal = (value as string).toLowerCase();
       if (lowerVal.length > 1) {
-        // Use the passed productDatabase prop for dynamic search
-        const matches = productDatabase.filter(p => p.name.toLowerCase().includes(lowerVal));
-        if (matches.length > 0) {
-           setSuggestions({ idx: ingIndex, list: matches });
-        } else {
-           setSuggestions(null);
-        }
-      } else {
-        setSuggestions(null);
-      }
-    }
-
-    setSubRecipes(newSubs);
-  };
-
-  const selectProduct = (subIndex: number, ingIndex: number, product: Product) => {
-    const newSubs = [...subRecipes];
-    newSubs[subIndex].ingredients[ingIndex] = {
-      ...newSubs[subIndex].ingredients[ingIndex],
-      name: product.name,
-      allergens: product.allergens,
-      unit: product.unit || newSubs[subIndex].ingredients[ingIndex].unit // Autofill unit if available
-    };
-    setSubRecipes(newSubs);
-    setSuggestions(null);
-  };
-
-  const toggleAllergen = (subIndex: number, ingIndex: number, allergen: Allergen) => {
-    const newSubs = [...subRecipes];
-    const ing = newSubs[subIndex].ingredients[ingIndex];
-    if (ing.allergens.includes(allergen)) {
-      ing.allergens = ing.allergens.filter(a => a !== allergen);
-    } else {
-      ing.allergens = [...ing.allergens, allergen];
+        const matches = productDatabase.filter(p => p.name.toLowerCase().includes(lowerVal)).slice(0, 5);
+        setSuggestions(matches.length ? { idx: ingIdx, list: matches } : null);
+      } else setSuggestions(null);
     }
     setSubRecipes(newSubs);
   };
-
-  // --- Form Submission ---
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const recipe: Recipe = {
+    onSave({
       id: initialRecipe?.id || Date.now().toString(),
-      name,
-      category,
-      photo,
-      yieldQuantity,
-      yieldUnit,
-      subRecipes, // La nueva estructura
-      platingInstructions,
-      serviceDetails,
+      name, category, photo, yieldQuantity, yieldUnit,
+      subRecipes, platingInstructions, serviceDetails,
       lastModified: Date.now()
-    };
-    onSave(recipe);
+    });
   };
 
-  const updateServiceDetail = (field: keyof ServiceDetails, value: string) => {
-    setServiceDetails(prev => ({ ...prev, [field]: value }));
+  // Funciones para añadir desde diccionario (clicado múltiple)
+  const appendCutlery = (item: string) => {
+    const current = serviceDetails.cutlery.trim();
+    const separator = current ? " + " : "";
+    setServiceDetails({...serviceDetails, cutlery: current + separator + item});
+  };
+
+  const appendTemp = (item: string) => {
+    const current = serviceDetails.servingTemp.trim();
+    const separator = current ? " | " : "";
+    setServiceDetails({...serviceDetails, servingTemp: current + separator + item});
   };
 
   return (
-    <form onSubmit={handleSubmit} className="bg-gray-50 min-h-screen pb-20 relative">
-      {/* Sticky Header */}
-      <div className="sticky top-0 z-20 bg-white border-b border-gray-200 px-4 py-3 shadow-sm flex justify-between items-center">
-        <div>
-           <h2 className="text-xl font-bold text-slate-800">
-            {initialRecipe ? 'Editar Ficha Compuesta' : 'Nueva Ficha Compuesta'}
-          </h2>
-          <p className="text-xs text-slate-500">Define las elaboraciones y el montaje del plato</p>
-        </div>
-        
-        <div className="flex gap-3">
-          <button type="button" onClick={onCancel} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-2">
-            <X size={20} /> <span className="hidden sm:inline">Cancelar</span>
+    <form onSubmit={handleSubmit} className="bg-slate-100 min-h-screen pb-20">
+      {/* Barra de Herramientas Superior */}
+      <div className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 px-8 py-4 shadow-sm flex justify-between items-center">
+        <div className="flex items-center gap-4">
+          <button type="button" onClick={onCancel} className="p-2 text-slate-400 hover:text-slate-900 transition-colors">
+            <X size={24} />
           </button>
-          <button type="submit" className="px-6 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors flex items-center gap-2 shadow-md">
-            <Save size={20} /> <span className="hidden sm:inline">Guardar Ficha</span>
+          <h2 className="text-xl font-black text-slate-800 flex items-center gap-2 uppercase tracking-tighter">
+            <Book size={24} className="text-amber-500"/> {initialRecipe ? 'Editar Ficha' : 'Nueva Ficha Técnica'}
+          </h2>
+        </div>
+        <div className="flex gap-4">
+          <button type="submit" className="px-8 py-3 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 flex items-center gap-2 shadow-xl transition-all active:scale-95 font-bold uppercase text-xs">
+            <Save size={18} /> Guardar Cambios
           </button>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="max-w-7xl mx-auto p-8 space-y-8">
         
-        {/* TOP SECTION: Basic Info & Main Photo */}
-        <div className="lg:col-span-12 grid grid-cols-1 md:grid-cols-12 gap-6 bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-           <div className="md:col-span-3">
-              <label className="block text-sm font-bold text-slate-700 mb-2">Foto Final del Plato</label>
-              <div className="relative aspect-[4/3] bg-gray-100 rounded-lg overflow-hidden border-2 border-dashed border-gray-300 hover:border-slate-400 transition-colors group">
-                {photo ? (
-                  <img src={photo} alt="Preview" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400">
-                    <ImageIcon size={32} className="mb-2 opacity-50" />
-                    <span className="text-xs">Subir foto plato</span>
-                  </div>
-                )}
-                <input 
-                  type="file" 
-                  accept="image/*" 
-                  onChange={(e) => handlePhotoUpload(e, true)} 
-                  className="absolute inset-0 opacity-0 cursor-pointer" 
-                />
-                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                  <p className="text-white text-xs font-bold flex items-center gap-1"><Upload size={14}/> Cambiar</p>
-                </div>
-              </div>
-           </div>
-
-           <div className="md:col-span-9 grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="md:col-span-2">
-                <label className="block text-sm font-bold text-slate-700 mb-1">Nombre de la Ficha (Plato)</label>
-                <input 
-                  required
-                  type="text" 
-                  value={name} 
-                  onChange={e => setName(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500 font-serif text-lg"
-                  placeholder="Ej: Solomillo al vino tinto con guarnición de castañas"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">Categoría</label>
-                <select 
-                  value={category} 
-                  onChange={e => setCategory(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500"
-                >
-                  {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-              <div>
-                 <label className="block text-sm font-bold text-slate-700 mb-1">Rendimiento</label>
-                 <input 
-                   type="number" 
-                   min="1"
-                   value={yieldQuantity} 
-                   onChange={e => setYieldQuantity(Number(e.target.value))}
-                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                 />
-              </div>
-              <div>
-                 <label className="block text-sm font-bold text-slate-700 mb-1">Unidad</label>
-                 <input 
-                   type="text" 
-                   value={yieldUnit} 
-                   onChange={e => setYieldUnit(e.target.value)}
-                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                   placeholder="Ej: Raciones"
-                 />
-              </div>
-              <div className="md:col-span-1 flex items-end pb-2 text-xs text-gray-500">
-                <InfoBox text="Define aquí el nombre global del plato. Añade las elaboraciones (salsas, guarniciones) abajo." />
-              </div>
-           </div>
+        {/* Cabecera: Info Básica */}
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-8 grid grid-cols-1 md:grid-cols-12 gap-10">
+          <div className="md:col-span-3">
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Imagen del Plato</label>
+            <div className="relative aspect-square bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 hover:border-amber-400 transition-all flex items-center justify-center overflow-hidden group cursor-pointer shadow-inner">
+              {photo ? <img src={photo} className="w-full h-full object-cover" /> : <ImageIcon size={48} className="text-slate-200" />}
+              <input type="file" accept="image/*" onChange={(e) => handlePhotoUpload(e, true)} className="absolute inset-0 opacity-0 cursor-pointer" />
+            </div>
+          </div>
+          <div className="md:col-span-9 grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="md:col-span-2">
+              <label className="block text-[10px] font-black text-slate-500 uppercase mb-2">Nombre de la Receta</label>
+              <input required type="text" value={name} onChange={e => setName(e.target.value)} className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-slate-900 outline-none text-xl font-serif font-bold text-slate-800" placeholder="Ej: Arroz con Costillejas..." />
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-slate-500 uppercase mb-2">Categoría</label>
+              <select value={category} onChange={e => setCategory(e.target.value)} className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none font-bold text-slate-700">
+                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-slate-500 uppercase mb-2">Rendimiento (Cant.)</label>
+              <input type="number" value={yieldQuantity} onChange={e => setYieldQuantity(Number(e.target.value))} className="w-full px-5 py-3 border border-slate-100 rounded-2xl" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-slate-500 uppercase mb-2">Unidad</label>
+              <input type="text" value={yieldUnit} onChange={e => setYieldUnit(e.target.value)} className="w-full px-5 py-3 border border-slate-100 rounded-2xl" placeholder="Raciones" />
+            </div>
+          </div>
         </div>
 
-        {/* MIDDLE SECTION: SubRecipes Manager */}
-        <div className="lg:col-span-8 space-y-4">
-           
-           <div className="flex items-center justify-between mb-2">
-              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                <Layers className="text-amber-500" size={20}/> Elaboraciones
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          
+          {/* Elaboraciones y Procesos */}
+          <div className="lg:col-span-8 space-y-6">
+            <div className="flex items-center justify-between px-2">
+              <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter flex items-center gap-2">
+                <Layers className="text-slate-300" /> Elaboraciones
               </h3>
-              <button 
-                type="button" 
-                onClick={addSubRecipe}
-                className="text-sm bg-slate-900 text-white px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-slate-700 transition-colors shadow-sm"
-              >
-                <Plus size={16} /> Nueva Elaboración
+              <button type="button" onClick={addSubRecipe} className="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-amber-500 transition-all flex items-center gap-2 shadow-lg">
+                <Plus size={16}/> Añadir Elaboración
               </button>
-           </div>
+            </div>
 
-           {/* Tabs */}
-           <div className="flex gap-2 overflow-x-auto pb-2 border-b border-gray-200">
+            {/* Pestañas de Elaboración */}
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
               {subRecipes.map((sub, idx) => (
                 <button
                   key={sub.id}
                   type="button"
                   onClick={() => setActiveTab(idx)}
-                  className={`px-4 py-2 rounded-t-lg text-sm font-medium transition-colors whitespace-nowrap flex items-center gap-2 ${
-                    activeTab === idx 
-                    ? 'bg-white text-slate-900 border border-gray-200 border-b-white shadow-sm -mb-px relative z-10' 
-                    : 'bg-gray-100 text-slate-500 hover:bg-gray-200'
-                  }`}
+                  className={`px-6 py-3 rounded-2xl text-xs font-black whitespace-nowrap transition-all border-2 flex items-center gap-3 ${activeTab === idx ? 'bg-slate-900 text-white border-slate-900 shadow-xl scale-105' : 'bg-white text-slate-400 border-white hover:border-slate-200'}`}
                 >
-                  {sub.name || `Elab. ${idx + 1}`}
-                  {subRecipes.length > 1 && (
-                     <span 
-                       onClick={(e) => { e.stopPropagation(); removeSubRecipe(idx); }}
-                       className="hover:text-red-500 p-0.5 rounded-full"
-                     >
-                       <X size={14}/>
-                     </span>
-                  )}
+                  <span className="opacity-50">{idx + 1}</span>
+                  {sub.name || `Elab. ${idx+1}`}
                 </button>
               ))}
-           </div>
+            </div>
 
-           {/* Active Tab Content */}
-           <div className="bg-white rounded-b-xl rounded-tr-xl border border-gray-200 shadow-sm p-6 relative">
-              {subRecipes[activeTab] && (
-                 <div className="space-y-6 animate-fadeIn">
-                    
-                    {/* SubRecipe Header */}
-                    <div className="flex flex-col md:flex-row gap-6">
-                       <div className="flex-grow space-y-4">
-                          <div>
-                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nombre de la elaboración</label>
-                             <input 
-                               type="text" 
-                               value={subRecipes[activeTab].name} 
-                               onChange={(e) => updateSubRecipeName(activeTab, e.target.value)}
-                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-400 font-bold"
-                               placeholder="Ej: Salsa de vino tinto"
-                             />
-                          </div>
-                          
-                          {/* Ingredients */}
-                          {/* FIX: Removed overflow-hidden from here to allow autocomplete dropdown to show */}
-                          <div className="bg-slate-50 rounded-lg border border-gray-200">
-                             <div className="px-3 py-2 bg-slate-100 border-b border-gray-200 flex justify-between items-center rounded-t-lg">
-                                <span className="text-xs font-bold text-slate-700 uppercase">Ingredientes (Géneros)</span>
-                                <button type="button" onClick={() => addIngredient(activeTab)} className="text-xs text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1">
-                                  <Plus size={14}/> Añadir
-                                </button>
-                             </div>
-                             <div className="divide-y divide-gray-100">
-                                {subRecipes[activeTab].ingredients.map((ing, iIdx) => (
-                                   <div key={ing.id} className="p-2 relative group hover:bg-white transition-colors">
-                                      <div className="flex gap-2 items-start">
-                                         <div className="flex-grow relative">
-                                            {/* IMPROVED SEARCH INPUT STYLES */}
-                                            <input 
-                                              type="text" 
-                                              placeholder="Buscar género..." 
-                                              value={ing.name}
-                                              onChange={(e) => updateIngredient(activeTab, iIdx, 'name', e.target.value)}
-                                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-slate-900 bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none placeholder-gray-400 shadow-sm"
-                                            />
-                                            {/* Autocomplete Dropdown */}
-                                            {suggestions && suggestions.idx === iIdx && (
-                                              <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-300 shadow-xl rounded-lg max-h-60 overflow-y-auto">
-                                                {suggestions.list.map(p => (
-                                                  <div 
-                                                    key={p.id}
-                                                    onClick={() => selectProduct(activeTab, iIdx, p)}
-                                                    className="px-3 py-2 hover:bg-amber-50 cursor-pointer text-sm flex justify-between items-center border-b border-gray-50 last:border-0"
-                                                  >
-                                                    <span className="font-medium text-slate-700">{p.name}</span>
-                                                    <div className="flex gap-1">
-                                                      {p.allergens.map(a => <span key={a} className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full">{a.substring(0,3)}</span>)}
-                                                    </div>
-                                                  </div>
-                                                ))}
-                                              </div>
-                                            )}
-                                         </div>
-                                         <input 
-                                            type="text" 
-                                            placeholder="Cant." 
-                                            value={ing.quantity}
-                                            onChange={(e) => updateIngredient(activeTab, iIdx, 'quantity', e.target.value)}
-                                            className="w-20 px-2 py-2 border border-gray-300 rounded-lg text-sm text-right text-slate-900 bg-white shadow-sm"
-                                          />
-                                          <input 
-                                            type="text" 
-                                            placeholder="Ud." 
-                                            value={ing.unit}
-                                            onChange={(e) => updateIngredient(activeTab, iIdx, 'unit', e.target.value)}
-                                            className="w-20 px-2 py-2 border border-gray-300 rounded-lg text-sm text-slate-900 bg-white shadow-sm"
-                                          />
-                                          
-                                          {/* Allergen Button - Triggers Modal */}
-                                          <button 
-                                            type="button"
-                                            onClick={() => setEditingAllergens({ subIndex: activeTab, ingIndex: iIdx })}
-                                            className={`p-2 rounded-lg hover:bg-gray-200 transition-colors border border-transparent hover:border-gray-300 ${ing.allergens.length > 0 ? 'text-red-500 bg-red-50 border-red-100' : 'text-gray-400'}`}
-                                            title="Gestionar Alérgenos"
-                                          >
-                                            <Shield size={18} fill={ing.allergens.length > 0 ? "currentColor" : "none"} />
-                                          </button>
+            {/* Editor de la Elaboración Activa */}
+            {subRecipes[activeTab] && (
+              <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm space-y-8">
+                <div className="flex justify-between items-start gap-6">
+                  <div className="flex-grow">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Título de la Elaboración</label>
+                    <input type="text" value={subRecipes[activeTab].name} onChange={e => updateSubRecipe(activeTab, 'name', e.target.value)} className="w-full px-4 py-2 text-xl font-bold border-b-2 border-slate-100 focus:border-slate-900 outline-none transition-colors" placeholder="Nombre de la elaboración..." />
+                  </div>
+                  <div className="w-32">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Foto Técnica</label>
+                    <div className="relative aspect-video bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-center overflow-hidden group">
+                      {subRecipes[activeTab].photo ? <img src={subRecipes[activeTab].photo} className="w-full h-full object-cover" /> : <ImageIcon size={20} className="text-slate-200"/>}
+                      <input type="file" accept="image/*" onChange={(e) => handlePhotoUpload(e, false, activeTab)} className="absolute inset-0 opacity-0 cursor-pointer" />
+                    </div>
+                  </div>
+                  {subRecipes.length > 1 && (
+                    <button type="button" onClick={() => removeSubRecipe(activeTab)} className="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-colors">
+                      <Trash2 size={20} />
+                    </button>
+                  )}
+                </div>
 
-                                          <button 
-                                            type="button" 
-                                            onClick={() => removeIngredient(activeTab, iIdx)}
-                                            className="text-gray-300 hover:text-red-500 p-2 hover:bg-red-50 rounded-lg transition-colors"
-                                          >
-                                            <Trash2 size={18} />
-                                          </button>
-                                      </div>
-                                      
-                                      {/* Allergen Tags (Read Only in List) */}
-                                      <div className="flex flex-wrap gap-1 mt-2 pl-1">
-                                        {ing.allergens.map(alg => (
-                                          <span key={alg} className="inline-flex items-center gap-1 bg-red-50 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-red-100">
-                                            {alg}
-                                          </span>
-                                        ))}
-                                      </div>
-                                   </div>
-                                ))}
-                             </div>
-                          </div>
-                       </div>
-
-                       {/* SubRecipe Photo */}
-                       <div className="w-full md:w-32 flex-shrink-0">
-                          <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Foto Elab.</label>
-                          <div className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-300 hover:border-slate-400 group">
-                            {subRecipes[activeTab].photo ? (
-                              <img src={subRecipes[activeTab].photo} alt="Sub" className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="absolute inset-0 flex items-center justify-center">
-                                <ImageIcon size={20} className="text-gray-300" />
-                              </div>
-                            )}
-                             <input 
-                                type="file" 
-                                accept="image/*" 
-                                onChange={(e) => handlePhotoUpload(e, false, activeTab)} 
-                                className="absolute inset-0 opacity-0 cursor-pointer" 
-                              />
-                          </div>
-                          {subRecipes[activeTab].photo && (
-                            <button type="button" onClick={() => {
-                              const newSubs = [...subRecipes];
-                              newSubs[activeTab].photo = '';
-                              setSubRecipes(newSubs);
-                            }} className="text-[10px] text-red-500 w-full text-center mt-1">Borrar</button>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center px-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Lista de Ingredientes</label>
+                    <button type="button" onClick={() => {
+                      const newSubs = [...subRecipes];
+                      newSubs[activeTab].ingredients.push({ id: Date.now().toString(), name: '', quantity: '', unit: '', allergens: [] });
+                      setSubRecipes(newSubs);
+                    }} className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 transition-colors">
+                      <Plus size={14}/> Añadir Ingrediente
+                    </button>
+                  </div>
+                  <div className="space-y-2 bg-slate-50 p-3 rounded-2xl border border-slate-100 shadow-inner">
+                    {subRecipes[activeTab].ingredients.map((ing, iIdx) => (
+                      <div key={ing.id} className="grid grid-cols-12 gap-3 bg-white p-3 rounded-xl shadow-sm border border-slate-100 animate-fadeIn">
+                        <div className="col-span-6 relative">
+                          <input type="text" value={ing.name} onChange={e => updateIngredient(activeTab, iIdx, 'name', e.target.value)} className="w-full px-3 py-1.5 text-sm border-none bg-transparent outline-none font-bold text-slate-700" placeholder="Ingrediente..." />
+                          {suggestions && suggestions.idx === iIdx && (
+                            <div className="absolute z-50 left-0 right-0 top-full mt-2 bg-white border border-slate-200 shadow-2xl rounded-2xl overflow-hidden max-h-52 overflow-y-auto">
+                              {suggestions.list.map(p => (
+                                <div key={p.id} onClick={() => {
+                                  const newSubs = [...subRecipes];
+                                  newSubs[activeTab].ingredients[iIdx] = { ...newSubs[activeTab].ingredients[iIdx], name: p.name, allergens: p.allergens, unit: p.unit || ing.unit };
+                                  setSubRecipes(newSubs);
+                                  setSuggestions(null);
+                                }} className="px-5 py-3 hover:bg-slate-50 cursor-pointer text-sm flex justify-between border-b last:border-0">
+                                  <span className="font-bold">{p.name}</span>
+                                  <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded uppercase font-black">{p.unit}</span>
+                                </div>
+                              ))}
+                            </div>
                           )}
-                       </div>
-                    </div>
+                        </div>
+                        <input type="text" value={ing.quantity} onChange={e => updateIngredient(activeTab, iIdx, 'quantity', e.target.value)} className="col-span-2 text-right px-1 py-1.5 text-sm border-none bg-transparent outline-none font-mono text-slate-500" placeholder="0.0" />
+                        <input type="text" value={ing.unit} onChange={e => updateIngredient(activeTab, iIdx, 'unit', e.target.value)} className="col-span-2 px-1 py-1.5 text-sm border-none bg-transparent outline-none text-slate-400 font-bold" placeholder="ud" />
+                        <div className="col-span-2 flex justify-end gap-1">
+                          <button type="button" onClick={() => setEditingAllergens({subIndex: activeTab, ingIndex: iIdx})} className={`p-2 rounded-lg transition-colors ${ing.allergens.length ? 'bg-red-50 text-red-500' : 'text-slate-200 hover:text-slate-400'}`}><Shield size={18}/></button>
+                          <button type="button" onClick={() => {
+                            const newSubs = [...subRecipes];
+                            newSubs[activeTab].ingredients.splice(iIdx, 1);
+                            setSubRecipes(newSubs);
+                          }} className="p-2 text-slate-200 hover:text-red-500"><Trash2 size={18}/></button>
+                        </div>
+                        {ing.allergens.length > 0 && (
+                          <div className="col-span-12 px-3 pb-1 flex gap-1 flex-wrap">
+                            {ing.allergens.map(a => <span key={a} className="text-[8px] bg-red-50 text-red-600 px-2 py-0.5 rounded-full border border-red-100 font-black uppercase">{a}</span>)}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
-                    {/* Instructions */}
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Proceso de Elaboración</label>
-                      <textarea 
-                        value={subRecipes[activeTab].instructions}
-                        onChange={e => updateSubRecipeInstructions(activeTab, e.target.value)}
-                        className="w-full p-3 border border-gray-300 rounded-lg outline-none text-slate-700 resize-y min-h-[150px] focus:ring-1 focus:ring-amber-400"
-                        placeholder="1. Cortar las verduras..."
-                      ></textarea>
-                    </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest">Procedimiento Técnico</label>
+                  <textarea value={subRecipes[activeTab].instructions} onChange={e => updateSubRecipe(activeTab, 'instructions', e.target.value)} className="w-full p-6 bg-slate-50 border border-slate-100 rounded-3xl text-sm min-h-[200px] outline-none focus:bg-white focus:ring-2 focus:ring-slate-900 transition-all leading-relaxed" placeholder="Describe los pasos de la elaboración..." />
+                </div>
+              </div>
+            )}
+          </div>
 
-                 </div>
-              )}
-           </div>
-        </div>
+          {/* Diccionarios Interactivos (Columna Derecha) */}
+          <div className="lg:col-span-4 space-y-6">
+            
+            {/* PANEL DE SALA (EL CEREBRO DEL CAMARERO) */}
+            <div className="bg-slate-900 rounded-3xl shadow-2xl overflow-hidden">
+              <div className="p-6 bg-slate-800 text-white border-b border-white/5">
+                <h3 className="font-black text-lg flex items-center gap-2 uppercase tracking-tighter">
+                  <Utensils size={20} className="text-amber-400"/> Información de Sala
+                </h3>
+              </div>
+              
+              <div className="p-6 space-y-6">
+                {/* Diccionario de Servicios */}
+                <div className="space-y-3">
+                   <button type="button" onClick={() => setOpenDict(openDict === 'service' ? 'none' : 'service')} className="w-full flex justify-between items-center text-xs font-black text-amber-400 uppercase tracking-widest p-2 bg-white/5 rounded-xl">
+                      Tipo de Servicio {openDict === 'service' ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
+                   </button>
+                   {openDict === 'service' && (
+                     <div className="grid grid-cols-1 gap-2 animate-fadeIn">
+                       {SERVICE_TYPES.map(s => (
+                         <button 
+                            key={s.id} 
+                            type="button" 
+                            onClick={() => { setServiceDetails({...serviceDetails, serviceType: s.name}); setOpenDict('none'); }}
+                            className={`text-left p-3 rounded-xl border transition-all ${serviceDetails.serviceType === s.name ? 'bg-amber-400 border-amber-400 text-slate-900' : 'bg-slate-800 border-slate-700 text-white hover:border-slate-500'}`}
+                          >
+                           <p className="font-black text-xs uppercase">{s.name}</p>
+                           <p className={`text-[10px] mt-1 italic ${serviceDetails.serviceType === s.name ? 'text-slate-800' : 'text-slate-400'}`}>{s.desc}</p>
+                         </button>
+                       ))}
+                     </div>
+                   )}
+                </div>
 
-        {/* RIGHT COLUMN: Service & Plating */}
-        <div className="lg:col-span-4 space-y-6">
-           
-           {/* Plating Instructions */}
-           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-              <h3 className="font-bold text-slate-800 border-b border-gray-200 pb-2 mb-3">Montaje y Emplatado</h3>
-              <p className="text-xs text-slate-500 mb-2">Describa cómo ensamblar las elaboraciones en el plato.</p>
-              <textarea 
-                value={platingInstructions}
-                onChange={e => setPlatingInstructions(e.target.value)}
-                className="w-full p-3 bg-slate-50 border border-gray-200 rounded-lg outline-none text-slate-700 resize-none h-40 focus:bg-white focus:ring-2 focus:ring-amber-400"
-                placeholder="Disponer la salsa en el fondo..."
-              ></textarea>
-           </div>
+                {/* Diccionario de Cubiertos (Clicado Múltiple) */}
+                <div className="space-y-3">
+                   <button type="button" onClick={() => setOpenDict(openDict === 'cutlery' ? 'none' : 'cutlery')} className="w-full flex justify-between items-center text-xs font-black text-indigo-400 uppercase tracking-widest p-2 bg-white/5 rounded-xl">
+                      Marcaje de Cubiertos {openDict === 'cutlery' ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
+                   </button>
+                   {openDict === 'cutlery' && (
+                     <div className="space-y-4 bg-slate-800 p-4 rounded-2xl border border-slate-700 max-h-80 overflow-y-auto custom-scrollbar animate-fadeIn">
+                       {Object.entries(CUTLERY_DICTIONARY).map(([cat, items]) => (
+                         <div key={cat} className="space-y-2">
+                           <p className="text-[9px] font-black text-slate-500 uppercase border-b border-slate-700 pb-1">{cat}</p>
+                           <div className="flex flex-wrap gap-1">
+                             {items.map(item => (
+                               <button key={item} type="button" onClick={() => appendCutlery(item)} className="text-[10px] font-bold bg-slate-700 text-slate-300 px-2.5 py-1.5 rounded-lg hover:bg-indigo-600 hover:text-white transition-all">
+                                 + {item}
+                               </button>
+                             ))}
+                           </div>
+                         </div>
+                       ))}
+                     </div>
+                   )}
+                   <textarea value={serviceDetails.cutlery} onChange={e => setServiceDetails({...serviceDetails, cutlery: e.target.value})} className="w-full bg-slate-800 border-2 border-slate-700 rounded-2xl px-4 py-3 text-xs text-white outline-none focus:border-indigo-500 h-24 custom-scrollbar" placeholder="Pulsa en los botones para añadir cubiertos..." />
+                </div>
 
-           {/* Service Details */}
-           <div className="bg-amber-50 rounded-xl border border-amber-200 shadow-sm p-4">
-              <h3 className="font-bold text-slate-800 border-b border-amber-200 pb-2 mb-4">Datos de Servicio</h3>
+                {/* Diccionario de Temperaturas (Clicado Múltiple) */}
+                <div className="space-y-3">
+                   <button type="button" onClick={() => setOpenDict(openDict === 'temp' ? 'none' : 'temp')} className="w-full flex justify-between items-center text-xs font-black text-rose-400 uppercase tracking-widest p-2 bg-white/5 rounded-xl">
+                      Temperaturas Pase {openDict === 'temp' ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
+                   </button>
+                   {openDict === 'temp' && (
+                     <div className="space-y-4 bg-slate-800 p-4 rounded-2xl border border-slate-700 max-h-80 overflow-y-auto custom-scrollbar animate-fadeIn">
+                       {Object.entries(TEMPERATURE_DICTIONARY).map(([cat, items]) => (
+                         <div key={cat} className="space-y-2">
+                           <p className="text-[9px] font-black text-slate-500 uppercase border-b border-slate-700 pb-1">{cat}</p>
+                           <div className="flex flex-wrap gap-1">
+                             {items.map(item => (
+                               <button key={item} type="button" onClick={() => appendTemp(item)} className="text-[10px] font-bold bg-slate-700 text-slate-300 px-2.5 py-1.5 rounded-lg hover:bg-rose-600 hover:text-white transition-all">
+                                 + {item}
+                               </button>
+                             ))}
+                           </div>
+                         </div>
+                       ))}
+                     </div>
+                   )}
+                   <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-500 uppercase mb-1">Temperatura</label>
+                        <input type="text" value={serviceDetails.servingTemp} onChange={e => setServiceDetails({...serviceDetails, servingTemp: e.target.value})} className="w-full bg-slate-800 border-2 border-slate-700 rounded-xl px-3 py-2 text-xs text-white" placeholder="Ej: 65°C - 75°C" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-500 uppercase mb-1">Pase</label>
+                        <input type="text" value={serviceDetails.passTime} onChange={e => setServiceDetails({...serviceDetails, passTime: e.target.value})} className="w-full bg-slate-800 border-2 border-slate-700 rounded-xl px-3 py-2 text-xs text-white" placeholder="Inmediato" />
+                      </div>
+                   </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Montaje y Emplatado Final */}
+            <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm space-y-6">
+              <h3 className="font-black text-slate-800 uppercase tracking-widest flex items-center gap-2 border-b border-slate-50 pb-4">
+                <Plus size={20} className="text-slate-300"/> Montaje Final
+              </h3>
               
               <div className="space-y-4">
                 <div>
-                   <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Temperatura Servicio</label>
-                   <input 
-                     type="text" 
-                     value={serviceDetails.servingTemp}
-                     onChange={e => updateServiceDetail('servingTemp', e.target.value)}
-                     className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-400 outline-none"
-                   />
+                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Instrucciones de Emplatado</label>
+                  <textarea value={platingInstructions} onChange={e => setPlatingInstructions(e.target.value)} className="w-full p-5 bg-slate-50 border border-slate-100 rounded-2xl text-sm min-h-[140px] outline-none focus:bg-white focus:ring-1 focus:ring-slate-900 transition-all" placeholder="Cómo disponer los elementos en el plato final..." />
                 </div>
-                
                 <div>
-                   <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Tiempo de Pase</label>
-                   <input 
-                     type="text" 
-                     value={serviceDetails.passTime}
-                     onChange={e => updateServiceDetail('passTime', e.target.value)}
-                     className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-400 outline-none"
-                   />
-                </div>
-
-                <div>
-                   <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Cubiertos / Marcaje</label>
-                   <input 
-                     type="text" 
-                     value={serviceDetails.cutlery}
-                     onChange={e => updateServiceDetail('cutlery', e.target.value)}
-                     className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-400 outline-none"
-                   />
-                </div>
-
-                 <div>
-                   <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Tipo de Servicio</label>
-                   <select
-                     value={serviceDetails.serviceType}
-                     onChange={e => updateServiceDetail('serviceType', e.target.value)}
-                     className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-400 outline-none"
-                   >
-                     <option value="">Seleccionar...</option>
-                     <option value="Emplatado">Emplatado</option>
-                     <option value="Fuente">Fuente / Family Style</option>
-                     <option value="Gueridón">Gueridón</option>
-                     <option value="Buffet">Buffet</option>
-                     <option value="Take Away">Take Away</option>
-                   </select>
-                </div>
-
-                <div>
-                   <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Notas Visuales</label>
-                   <textarea
-                     value={serviceDetails.presentation}
-                     onChange={e => updateServiceDetail('presentation', e.target.value)}
-                     className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-400 outline-none resize-none h-20"
-                     placeholder="Altura, colores..."
-                   ></textarea>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Descripción Comercial (Menú)</label>
+                  <textarea value={serviceDetails.clientDescription} onChange={e => setServiceDetails({...serviceDetails, clientDescription: e.target.value})} className="w-full p-5 bg-slate-50 border border-slate-100 rounded-2xl text-sm italic font-serif min-h-[100px] outline-none" placeholder="Texto sugerido para el camarero al servir..." />
                 </div>
               </div>
-           </div>
-           
-           <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-              <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Descripción Comercial</label>
-              <textarea
-                value={serviceDetails.clientDescription}
-                onChange={e => updateServiceDetail('clientDescription', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-slate-500 outline-none resize-none h-24"
-              ></textarea>
-           </div>
-
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Allergen Selection Modal */}
+      {/* Modal Alérgenos (Mantiene funcionalidad previa) */}
       {editingAllergens && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fadeIn">
-          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden">
-             <div className="bg-slate-900 text-white px-6 py-4 flex justify-between items-center">
-                <h3 className="text-lg font-bold flex items-center gap-2"><Shield size={20}/> Selección de Alérgenos</h3>
-                <button 
-                  type="button"
-                  onClick={() => setEditingAllergens(null)} 
-                  className="text-slate-400 hover:text-white transition-colors"
-                >
-                  <X size={24} />
-                </button>
-             </div>
-             
-             <div className="p-6">
-                <p className="text-sm text-slate-500 mb-4">
-                  Selecciona los alérgenos presentes en: <span className="font-bold text-slate-900">{subRecipes[editingAllergens.subIndex].ingredients[editingAllergens.ingIndex].name || "Ingrediente sin nombre"}</span>
-                </p>
-                
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                   {ALLERGEN_LIST.map(allergen => {
-                     const isSelected = subRecipes[editingAllergens.subIndex].ingredients[editingAllergens.ingIndex].allergens.includes(allergen);
-                     return (
-                       <button
-                         key={allergen}
-                         type="button"
-                         onClick={() => toggleAllergen(editingAllergens.subIndex, editingAllergens.ingIndex, allergen)}
-                         className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium border transition-all ${
-                           isSelected 
-                           ? 'bg-red-50 border-red-500 text-red-700 shadow-sm' 
-                           : 'bg-white border-gray-200 text-slate-600 hover:bg-gray-50'
-                         }`}
-                       >
-                         <span>{allergen}</span>
-                         {isSelected && <Check size={16} />}
-                       </button>
-                     );
-                   })}
-                </div>
-             </div>
-
-             <div className="bg-gray-50 px-6 py-4 flex justify-end">
-                <button 
-                  type="button"
-                  onClick={() => setEditingAllergens(null)}
-                  className="px-6 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors font-medium"
-                >
-                  Confirmar
-                </button>
-             </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 animate-fadeIn">
+          <div className="bg-white rounded-[2rem] shadow-2xl max-w-lg w-full p-8 border border-white/20">
+            <h3 className="text-2xl font-black mb-6 flex items-center gap-3 text-slate-900 uppercase tracking-tighter"><Shield className="text-red-500" size={28}/> Gestión de Alérgenos</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {ALLERGEN_LIST.map(a => {
+                const ing = subRecipes[editingAllergens.subIndex].ingredients[editingAllergens.ingIndex];
+                const isSelected = ing.allergens.includes(a);
+                return (
+                  <button
+                    key={a}
+                    type="button"
+                    onClick={() => {
+                      const newSubs = [...subRecipes];
+                      const ingRef = newSubs[editingAllergens.subIndex].ingredients[editingAllergens.ingIndex];
+                      ingRef.allergens = isSelected ? ingRef.allergens.filter(x => x !== a) : [...ingRef.allergens, a];
+                      setSubRecipes(newSubs);
+                    }}
+                    className={`px-4 py-3 rounded-2xl text-[10px] font-black border-2 flex items-center justify-between transition-all uppercase ${isSelected ? 'bg-red-50 border-red-500 text-red-700 shadow-md' : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-slate-300'}`}
+                  >
+                    {a} {isSelected && <Check size={14}/>}
+                  </button>
+                );
+              })}
+            </div>
+            <button type="button" onClick={() => setEditingAllergens(null)} className="w-full mt-8 bg-slate-900 text-white py-4 rounded-2xl font-black shadow-2xl hover:bg-slate-800 transition-all uppercase tracking-widest">Aceptar Cambios</button>
           </div>
         </div>
       )}
-
     </form>
   );
 };
-
-const InfoBox = ({text}: {text: string}) => (
-  <div className="bg-blue-50 text-blue-700 p-2 rounded text-xs flex gap-2 items-start border border-blue-100">
-    <div className="mt-0.5"><AlertTriangle size={12}/></div>
-    <span>{text}</span>
-  </div>
-);

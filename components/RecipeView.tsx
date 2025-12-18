@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
-import { Recipe, AppSettings, Allergen } from '../types';
-import { Printer, ArrowLeft, Info, AlertOctagon } from 'lucide-react';
+import { Recipe, AppSettings, Allergen, SERVICE_TYPES } from '../types';
+import { Printer, ArrowLeft, Info, AlertOctagon, Utensils, Thermometer, ChefHat } from 'lucide-react';
 
 interface RecipeViewProps {
   recipe: Recipe;
@@ -20,70 +20,72 @@ export const RecipeView: React.FC<RecipeViewProps> = ({ recipe, settings, onBack
     return Array.from(set);
   }, [recipe]);
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const serviceTypeData = useMemo(() => {
+    return SERVICE_TYPES.find(t => t.name === recipe.serviceDetails.serviceType);
+  }, [recipe.serviceDetails.serviceType]);
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 md:p-8 print:p-0 print:bg-white">
-      {/* Botones de acción (No se imprimen) */}
+      {/* Botones de acción */}
       <div className="max-w-5xl mx-auto mb-6 flex justify-between items-center no-print">
         <button 
           onClick={onBack}
-          className="flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors"
+          className="flex items-center gap-2 text-slate-600 hover:text-slate-900 font-bold"
         >
           <ArrowLeft size={20} />
-          <span>Volver</span>
+          <span>Volver al Panel</span>
         </button>
         <button 
-          onClick={handlePrint}
-          className="flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-lg hover:bg-slate-700 transition-colors"
+          onClick={() => window.print()}
+          className="flex items-center gap-2 bg-slate-800 text-white px-5 py-2.5 rounded-xl hover:bg-slate-700 transition-all shadow-lg"
         >
           <Printer size={20} />
           <span>Imprimir / PDF</span>
         </button>
       </div>
 
-      {/* Ficha Técnica */}
-      <div className="max-w-5xl mx-auto bg-white shadow-xl print:shadow-none print:w-full">
+      {/* Ficha Principal */}
+      <div className="max-w-5xl mx-auto bg-white shadow-2xl print:shadow-none print:w-full overflow-hidden rounded-2xl print:rounded-none">
         
-        {/* Cabecera para Impresión */}
-        <div className="hidden print:flex justify-between items-center p-6 border-b-2 border-black mb-4">
+        {/* Cabecera Impresión */}
+        <div className="hidden print:flex justify-between items-center p-8 border-b-2 border-black">
           <div className="w-1/3">
-            {settings.instituteLogo && <img src={settings.instituteLogo} alt="Logo IES" className="h-16 object-contain mb-1" />}
-            <p className="font-bold text-[10px] uppercase">{settings.instituteName}</p>
+            {settings.instituteLogo && <img src={settings.instituteLogo} alt="IES" className="h-16 object-contain" />}
+            <p className="font-bold text-[10px] mt-1 uppercase">{settings.instituteName}</p>
           </div>
           <div className="w-1/3 text-center">
-            <h1 className="text-2xl font-serif font-bold uppercase">{recipe.name}</h1>
-            <p className="text-xs text-gray-500 uppercase">{recipe.category} • Ficha Técnica</p>
+            <h1 className="text-3xl font-serif font-bold uppercase leading-tight">{recipe.name}</h1>
+            <p className="text-xs text-slate-500 uppercase tracking-widest mt-1">{recipe.category} • FICHA TÉCNICA</p>
           </div>
           <div className="w-1/3 text-right">
-            {settings.teacherLogo && <img src={settings.teacherLogo} alt="Avatar" className="h-12 w-12 rounded-full object-cover ml-auto mb-1 border" />}
+            {settings.teacherLogo && <img src={settings.teacherLogo} alt="Teacher" className="h-12 w-12 rounded-full object-cover ml-auto mb-1 border" />}
             <p className="font-bold text-[10px]">{settings.teacherName}</p>
           </div>
         </div>
 
-        {/* Cabecera para Pantalla */}
-        <div className="bg-slate-900 text-white p-6 print:hidden">
+        {/* Cabecera Pantalla */}
+        <div className="bg-slate-900 text-white p-8 print:hidden">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-slate-400 font-medium uppercase tracking-wider text-xs">{recipe.category}</p>
-              <h1 className="text-3xl font-serif font-bold mt-1">{recipe.name}</h1>
+              <p className="text-amber-400 font-bold uppercase tracking-widest text-xs mb-2">{recipe.category}</p>
+              <h1 className="text-4xl font-serif font-bold leading-tight">{recipe.name}</h1>
             </div>
-            <div className="text-right">
-              <div className="text-xs opacity-70">Rendimiento</div>
-              <div className="text-xl font-bold">{recipe.yieldQuantity} {recipe.yieldUnit}</div>
+            <div className="bg-white/10 p-4 rounded-2xl backdrop-blur-sm text-right">
+              <div className="text-[10px] uppercase font-bold opacity-60">Rendimiento</div>
+              <div className="text-2xl font-black">{recipe.yieldQuantity} <span className="text-sm font-normal opacity-80">{recipe.yieldUnit}</span></div>
             </div>
           </div>
         </div>
 
-        {/* Barra de Alérgenos */}
+        {/* Alérgenos */}
         {allAllergens.length > 0 && (
-          <div className="bg-red-50 border-b border-red-100 p-3 px-6 flex items-center gap-3 print:bg-white print:border-black print:border-b-2">
-            <AlertOctagon size={16} className="text-red-600" />
-            <div className="flex flex-wrap gap-1">
+          <div className="bg-red-50 border-b border-red-100 p-4 px-8 flex items-center gap-4 print:bg-white print:border-black print:border-b-2">
+            <div className="flex items-center gap-2 text-red-600 font-bold text-xs uppercase">
+              <AlertOctagon size={18} /> Alérgenos:
+            </div>
+            <div className="flex flex-wrap gap-2">
               {allAllergens.map(a => (
-                <span key={a} className="bg-white border border-red-200 text-red-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase print:border-black">
+                <span key={a} className="bg-white border-2 border-red-200 text-red-700 px-3 py-1 rounded-lg text-[10px] font-black uppercase print:border-black">
                   {a}
                 </span>
               ))}
@@ -91,95 +93,119 @@ export const RecipeView: React.FC<RecipeViewProps> = ({ recipe, settings, onBack
           </div>
         )}
 
+        {/* Bloque Información de Sala (Solicitado) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x border-b border-slate-100 print:border-black">
+          <div className="p-6 flex items-start gap-4">
+            <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600 print:bg-white print:border print:border-black">
+              <Utensils size={20} />
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase text-slate-400 mb-1">Servicio de Sala</p>
+              <p className="font-bold text-slate-800 text-sm">{recipe.serviceDetails.serviceType}</p>
+              {serviceTypeData && <p className="text-[10px] text-slate-500 mt-1 italic">{serviceTypeData.desc}</p>}
+            </div>
+          </div>
+          <div className="p-6 flex items-start gap-4">
+            <div className="p-2 bg-amber-50 rounded-lg text-amber-600 print:bg-white print:border print:border-black">
+              <Utensils size={20} />
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase text-slate-400 mb-1">Marcaje de Cubiertos</p>
+              <p className="font-medium text-slate-800 text-sm leading-relaxed">{recipe.serviceDetails.cutlery || 'Estándar'}</p>
+            </div>
+          </div>
+          <div className="p-6 flex items-start gap-4">
+            <div className="p-2 bg-rose-50 rounded-lg text-rose-600 print:bg-white print:border print:border-black">
+              <Thermometer size={20} />
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase text-slate-400 mb-1">Temperatura Pase</p>
+              <p className="font-bold text-slate-800 text-sm">{recipe.serviceDetails.servingTemp || 'N/A'}</p>
+              <p className="text-[10px] text-slate-500 mt-1 uppercase font-bold">Pase: {recipe.serviceDetails.passTime || 'Inmediato'}</p>
+            </div>
+          </div>
+        </div>
+
         {/* Contenido Principal */}
-        <div className="p-6 md:p-8 print:p-6 print:pt-2">
+        <div className="p-8 space-y-12">
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10 print:mb-6">
-            {/* Columna Izquierda: Foto y Detalles de Servicio */}
-            <div className="md:col-span-1 space-y-6">
-              <div className="aspect-square bg-gray-50 rounded-lg overflow-hidden border border-gray-200 print:border-black">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-10">
+            {/* Foto e Info Lateral */}
+            <div className="md:col-span-4 space-y-6">
+              <div className="aspect-[4/3] bg-slate-50 rounded-2xl overflow-hidden border border-slate-100 shadow-inner print:border-black">
                 {recipe.photo ? (
                   <img src={recipe.photo} alt={recipe.name} className="w-full h-full object-cover" />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-gray-300">Sin foto</div>
+                  <div className="w-full h-full flex flex-col items-center justify-center text-slate-300 italic text-xs">Sin imagen principal</div>
                 )}
               </div>
-
-              <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 print:bg-white print:border-black">
-                <h3 className="font-bold text-xs uppercase border-b pb-2 mb-3 flex items-center gap-2">
-                  <Info size={14} /> Servicio
-                </h3>
-                <div className="space-y-2 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500 uppercase font-bold text-[9px]">Temperatura</span>
-                    <span className="font-medium">{recipe.serviceDetails?.servingTemp || '-'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500 uppercase font-bold text-[9px]">Tiempo Pase</span>
-                    <span className="font-medium">{recipe.serviceDetails?.passTime || '-'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500 uppercase font-bold text-[9px]">Servicio</span>
-                    <span className="font-medium">{recipe.serviceDetails?.serviceType || '-'}</span>
-                  </div>
-                </div>
+              
+              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 print:bg-white print:border-black">
+                <h4 className="font-black text-[10px] uppercase text-slate-400 mb-3 tracking-widest">Descripción Comercial</h4>
+                <p className="text-sm italic font-serif text-slate-700 leading-relaxed border-l-4 border-amber-200 pl-4 print:border-black">
+                  "{recipe.serviceDetails.clientDescription || 'No definida.'}"
+                </p>
               </div>
             </div>
 
-            {/* Columna Derecha: Descripción y Montaje */}
-            <div className="md:col-span-2">
-              {recipe.serviceDetails?.clientDescription && (
-                <div className="bg-amber-50/50 p-4 rounded-lg border border-amber-100 mb-6 print:bg-white print:border-black">
-                  <h4 className="font-bold text-[10px] uppercase text-amber-800 mb-1 print:text-black">Descripción Comercial</h4>
-                  <p className="text-sm italic text-slate-700 leading-relaxed print:text-black italic">"{recipe.serviceDetails.clientDescription}"</p>
-                </div>
-              )}
-              
-              <h3 className="font-bold text-sm uppercase border-b border-gray-200 pb-1 mb-3 print:border-black">Montaje y Emplatado</h3>
-              <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed print:text-black">
-                {recipe.platingInstructions || "No se han definido instrucciones de montaje."}
+            {/* Montaje Final */}
+            <div className="md:col-span-8">
+              <div className="flex items-center gap-3 mb-4">
+                <ChefHat className="text-slate-400" size={24} />
+                <h3 className="text-lg font-bold uppercase tracking-widest text-slate-800 print:text-black">Montaje y Emplatado</h3>
+              </div>
+              <div className="text-sm text-slate-700 whitespace-pre-wrap leading-loose text-justify bg-slate-50/50 p-6 rounded-2xl border border-slate-100 print:p-0 print:bg-white print:border-none print:text-black">
+                {recipe.platingInstructions || "Instrucciones de montaje no definidas."}
               </div>
             </div>
           </div>
 
-          {/* Sección de Elaboraciones */}
-          <div className="space-y-8 print:space-y-6">
-            <h2 className="text-lg font-bold text-center border-b-2 border-gray-100 pb-2 uppercase tracking-widest print:border-black">Desglose de Elaboraciones</h2>
+          {/* Elaboraciones (SubRecipes) */}
+          <div className="space-y-10">
+            <h2 className="text-xl font-black text-center border-y-2 border-slate-100 py-4 uppercase tracking-[0.3em] text-slate-400 print:border-black print:text-black">Desglose de Elaboraciones</h2>
             
             {recipe.subRecipes?.map((sub, idx) => (
-              <div key={sub.id || idx} className="border border-gray-200 rounded-xl p-6 bg-white print:border-black print:p-4 break-inside-avoid">
-                <div className="flex flex-col md:flex-row gap-6">
-                  {/* Ingredientes de la elaboración */}
-                  <div className="md:w-1/3">
-                    <div className="flex items-center gap-2 mb-4">
-                      <span className="bg-slate-800 text-white w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-bold print:bg-black">{idx + 1}</span>
-                      <h3 className="font-bold text-base leading-tight">{sub.name}</h3>
+              <div key={sub.id || idx} className="border border-slate-200 rounded-3xl p-8 bg-white shadow-sm print:border-black print:p-4 break-inside-avoid">
+                <div className="flex flex-col md:flex-row gap-10">
+                  {/* Ingredientes */}
+                  <div className="md:w-5/12">
+                    <div className="flex items-center gap-4 mb-6">
+                      <span className="bg-slate-900 text-white w-8 h-8 flex items-center justify-center rounded-xl text-xs font-black print:bg-black">{idx + 1}</span>
+                      <h3 className="font-black text-lg uppercase text-slate-800 print:text-black">{sub.name}</h3>
                     </div>
                     
-                    <table className="w-full text-[11px]">
+                    {sub.photo && (
+                      <div className="w-full aspect-video rounded-2xl overflow-hidden border border-slate-100 mb-6 print:border-black">
+                        <img src={sub.photo} alt={sub.name} className="w-full h-full object-cover" />
+                      </div>
+                    )}
+
+                    <table className="w-full text-xs">
                       <thead>
-                        <tr className="border-b border-gray-100 uppercase text-slate-400 print:text-black print:border-black">
-                          <th className="text-left py-1">Ingrediente</th>
-                          <th className="text-right py-1">Cant.</th>
-                          <th className="text-left py-1 pl-1">Ud.</th>
+                        <tr className="border-b border-slate-100 uppercase text-[10px] font-black text-slate-400 print:text-black print:border-black">
+                          <th className="text-left py-2">Ingrediente</th>
+                          <th className="text-right py-2">Cant.</th>
+                          <th className="text-left py-2 pl-3">Ud.</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-50 print:divide-gray-200">
+                      <tbody className="divide-y divide-slate-50 print:divide-slate-200">
                         {sub.ingredients?.map((ing, iIdx) => (
                           <tr key={ing.id || iIdx}>
-                            <td className="py-1.5 font-medium text-slate-700 print:text-black">{ing.name}</td>
-                            <td className="py-1.5 text-right font-mono text-slate-500 print:text-black">{ing.quantity}</td>
-                            <td className="py-1.5 pl-1 text-slate-400 print:text-black">{ing.unit}</td>
+                            <td className="py-2.5 font-bold text-slate-700 print:text-black">{ing.name}</td>
+                            <td className="py-2.5 text-right font-mono text-slate-500 print:text-black">{ing.quantity}</td>
+                            <td className="py-2.5 pl-3 text-slate-400 print:text-black">{ing.unit}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
 
-                  {/* Proceso de la elaboración */}
-                  <div className="md:w-2/3 border-t md:border-t-0 md:border-l border-gray-100 md:pl-6 pt-4 md:pt-0 print:border-black print:border-l">
-                    <h4 className="text-[10px] font-bold uppercase text-slate-400 mb-2 print:text-black">Procedimiento</h4>
-                    <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed print:text-black">
+                  {/* Proceso */}
+                  <div className="md:w-7/12 md:border-l border-slate-100 md:pl-10 print:border-black print:border-l-2">
+                    <h4 className="text-[10px] font-black uppercase text-slate-300 mb-4 tracking-widest flex items-center gap-2 print:text-black">
+                      <Info size={14} /> Procedimiento Técnico
+                    </h4>
+                    <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed text-justify print:text-black">
                       {sub.instructions || "Sin instrucciones detalladas."}
                     </div>
                   </div>
@@ -187,14 +213,13 @@ export const RecipeView: React.FC<RecipeViewProps> = ({ recipe, settings, onBack
               </div>
             ))}
           </div>
-
         </div>
 
-        {/* Pie de página para impresión */}
-        <div className="hidden print:block text-center text-[9px] text-gray-400 mt-10 py-4 border-t border-black">
-          {settings.instituteName} • {settings.teacherName} • Generado el {new Date().toLocaleDateString()}
+        {/* Footer Impresión */}
+        <div className="hidden print:flex justify-between items-center text-[9px] text-slate-400 p-8 border-t border-black mt-12">
+          <p>{settings.instituteName} • Departamento de Hostelería</p>
+          <p>Generado por {settings.teacherName} • {new Date().toLocaleDateString()}</p>
         </div>
-
       </div>
     </div>
   );

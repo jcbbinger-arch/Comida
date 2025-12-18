@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Recipe, AppSettings, AppBackup, Product } from './types';
 import { useLocalStorage } from './hooks/useLocalStorage';
@@ -165,18 +166,21 @@ function App() {
     alert('Copia de seguridad restaurada correctamente.');
   };
 
+  // Function to migrate legacy recipes with single ingredients/instructions to the new subRecipes format
   const migrateRecipeIfNeeded = (r: Recipe): Recipe => {
-    if (r.subRecipes && r.subRecipes.length > 0) return r;
+    // Cast to any to access legacy properties during migration that are no longer in the Recipe interface
+    const legacy = r as any;
+    if (legacy.subRecipes && legacy.subRecipes.length > 0) return r;
     return {
       ...r,
       subRecipes: [{
         id: 'legacy-1',
         name: 'Elaboración Principal',
-        ingredients: r.ingredients || [],
-        instructions: r.instructions || '',
+        ingredients: legacy.ingredients || [],
+        instructions: legacy.instructions || '',
         photo: ''
       }],
-      platingInstructions: ''
+      platingInstructions: legacy.platingInstructions || ''
     };
   };
 

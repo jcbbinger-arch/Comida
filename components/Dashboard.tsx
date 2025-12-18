@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { Recipe, AppSettings, Allergen } from '../types';
 import { Plus, Search, Eye, Edit2, Trash2, Download, Upload, ChefHat, Settings, Calendar, Database, LogOut } from 'lucide-react';
@@ -79,12 +80,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
     event.target.value = ''; 
   };
 
+  // Helper to extract all allergens from a recipe
   const getRecipeAllergens = (recipe: Recipe): string[] => {
      const set = new Set<string>();
-     if (recipe.subRecipes) {
-       recipe.subRecipes.forEach(sub => sub.ingredients.forEach(i => i.allergens?.forEach(a => set.add(a))));
-     } else if (recipe.ingredients) {
-       recipe.ingredients.forEach(i => i.allergens?.forEach(a => set.add(a)));
+     // Cast to any to safely handle potential legacy recipe data structures during extraction
+     const r = recipe as any;
+     if (r.subRecipes) {
+       r.subRecipes.forEach((sub: any) => sub.ingredients.forEach((i: any) => i.allergens?.forEach((a: string) => set.add(a))));
+     } else if (r.ingredients) {
+       r.ingredients.forEach((i: any) => i.allergens?.forEach((a: string) => set.add(a)));
      }
      return Array.from(set);
   };
