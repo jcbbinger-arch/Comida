@@ -1,4 +1,3 @@
-
 import React, { useMemo } from 'react';
 import { Recipe, AppSettings, Allergen } from '../types';
 import { Printer, ArrowLeft, Info, AlertOctagon } from 'lucide-react';
@@ -236,6 +235,7 @@ export const RecipeView: React.FC<RecipeViewProps> = ({ recipe, settings, onBack
                 </div>
              ))}
           </div>
+        </div>
         
         {/* Footer for print */}
         <div className="hidden print:block text-center text-[10px] text-gray-500 mt-8 pt-4 border-t border-black">
