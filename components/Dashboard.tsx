@@ -39,36 +39,38 @@ export const Dashboard: React.FC<DashboardProps> = ({
   );
 
   const copyRecipePrompt = () => {
-    const prompt = `ACTÚA COMO UN GENERADOR DE DATOS JSON PURO. NO ESCRIBAS EXPLICACIONES, NO USES BLOQUES DE CÓDIGO (\`\`\`).
-Genera un objeto JSON para la receta: [NOMBRE O LISTA DE INGREDIENTES].
-ESTRUCTURA EXACTA REQUERIDA:
+    const prompt = `ACTÚA COMO UN GENERADOR DE DATOS ESTRUCTURADOS PARA UNA FICHA TÉCNICA DE COCINA. 
+NO ESCRIBAS EXPLICACIONES, NO SALUDES, NO USES BLOQUES DE CÓDIGO (\`\`\`). SOLO EL JSON.
+
+Genera el objeto JSON para la receta: [NOMBRE O LISTA DE INGREDIENTES].
+ESTRUCTURA OBLIGATORIA (Copia exactamente esta estructura):
 {
-  "name": "Nombre del Plato",
-  "category": "Carnes/Pescados/Postres/etc",
+  "name": "Nombre exacto del plato",
+  "category": "Carnes",
   "yieldQuantity": 10,
   "yieldUnit": "Raciones",
-  "creator": "${settings.teacherName}",
   "subRecipes": [
     {
-      "name": "Base o Elaboración Principal",
+      "name": "Nombre de la elaboración (ej: Relleno)",
       "ingredients": [
-        { "name": "Ingrediente", "quantity": "0.500", "unit": "kg", "allergens": ["Gluten"] }
+        { "name": "Nombre ingrediente", "quantity": "0.500", "unit": "kg", "allergens": [] }
       ],
-      "instructions": "Pasos técnicos detallados..."
+      "instructions": "Pasos técnicos paso a paso..."
     }
   ],
-  "platingInstructions": "Instrucciones de montaje...",
+  "platingInstructions": "Cómo se monta el plato final...",
   "serviceDetails": {
     "serviceType": "Servicio a la Americana",
     "cutlery": "Tenedor y cuchillo...",
-    "servingTemp": "70ºC",
-    "clientDescription": "Descripción sugerente..."
+    "servingTemp": "75ºC",
+    "clientDescription": "Descripción sugerente para la carta..."
   }
 }
-IMPORTANTE: Devuelve únicamente el objeto entre llaves { ... }. No incluyas nada más.`;
+
+IMPORTANTE: Los ingredientes deben coincidir con nombres comunes de inventario. Devuelve ÚNICAMENTE las llaves { ... }.`;
     
     navigator.clipboard.writeText(prompt);
-    alert('Prompt Maestro de Receta copiado. Pégalo en Gemini para obtener el JSON directo.');
+    alert('Prompt Maestro de Receta copiado. Pégalo en Gemini y luego usa "Pegado Inteligente" en el editor.');
   };
 
   const handleImportClick = () => fileInputRef.current?.click();

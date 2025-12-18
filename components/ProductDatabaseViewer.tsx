@@ -45,24 +45,47 @@ Devuelve exclusivamente el array JSON [ ... ].`;
     return ALLERGEN_LIST.find(a => a.toLowerCase() === clean) || null;
   };
 
+  /**
+   * Lógica de Merge (Fusión):
+   * 1. Toma la lista actual (products).
+   * 2. Itera sobre los nuevos.
+   * 3. Si el nombre coincide, actualiza.
+   * 4. Si no, añade.
+   */
   const processImportedList = (importedList: any[]) => {
-    const updatedDatabase = [...products];
+    const updatedDatabase = [...products]; // Comenzamos con lo que ya tenemos
+    let addedCount = 0;
+    let updatedCount = 0;
+
     importedList.forEach((newProd: any) => {
-      const index = updatedDatabase.findIndex(p => p.name.toLowerCase() === newProd.name.toLowerCase());
+      const cleanName = newProd.name.trim();
+      // Buscamos si ya existe por nombre (insensible a mayúsculas)
+      const index = updatedDatabase.findIndex(p => p.name.trim().toLowerCase() === cleanName.toLowerCase());
+      
+      const price = typeof newProd.pricePerUnit === 'string' 
+        ? parseFloat(newProd.pricePerUnit.replace(',', '.')) 
+        : (parseFloat(newProd.pricePerUnit) || 0);
+
       const prodData: Product = {
         id: index >= 0 ? updatedDatabase[index].id : `prod_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-        name: newProd.name,
-        category: newProd.category || 'Otros',
-        unit: newProd.unit || 'kg',
-        pricePerUnit: typeof newProd.pricePerUnit === 'string' 
-          ? parseFloat(newProd.pricePerUnit.replace(',', '.')) 
-          : (parseFloat(newProd.pricePerUnit) || 0),
+        name: cleanName,
+        category: newProd.category || (index >= 0 ? updatedDatabase[index].category : 'Importado'),
+        unit: newProd.unit || (index >= 0 ? updatedDatabase[index].unit : 'kg'),
+        pricePerUnit: price,
         allergens: Array.isArray(newProd.allergens) ? newProd.allergens : []
       };
-      if (index >= 0) { updatedDatabase[index] = prodData; }
-      else { updatedDatabase.push(prodData); }
+
+      if (index >= 0) {
+        updatedDatabase[index] = prodData; // Actualizamos el existente con los nuevos datos
+        updatedCount++;
+      } else {
+        updatedDatabase.push(prodData); // Añadimos como nuevo
+        addedCount++;
+      }
     });
+
     onImport(updatedDatabase);
+    return { addedCount, updatedCount };
   };
 
   const handleImportJson = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -73,8 +96,8 @@ Devuelve exclusivamente el array JSON [ ... ].`;
       try {
         const importedList = JSON.parse(event.target?.result as string);
         if (!Array.isArray(importedList)) return alert('El JSON debe ser un array de productos.');
-        processImportedList(importedList);
-        alert(`${importedList.length} productos procesados (JSON).`);
+        const { addedCount, updatedCount } = processImportedList(importedList);
+        alert(`Importación JSON finalizada:\n- ${addedCount} nuevos\n- ${updatedCount} actualizados\nTotal catálogo: ${products.length + addedCount}`);
       } catch (err) { alert('Error al procesar el archivo JSON.'); }
     };
     reader.readAsText(file);
@@ -90,15 +113,19 @@ Devuelve exclusivamente el array JSON [ ... ].`;
         const text = event.target?.result as string;
         const lines = text.split(/\r?\n/);
         const importedList: any[] = [];
-        const startLine = lines[0].toLowerCase().includes('nombre') ? 1 : 0;
+        
+        // Detectamos si la primera línea es cabecera
+        const startLine = lines[0].toLowerCase().includes('nombre') || lines[0].toLowerCase().includes('iva') ? 1 : 0;
 
         for (let i = startLine; i < lines.length; i++) {
-          if (!lines[i].trim()) continue;
-          const cols = lines[i].split(';');
+          const line = lines[i].trim();
+          if (!line) continue;
+          
+          const cols = line.split(';');
           if (cols.length < 3) continue;
 
           const allergensRaw = cols[3] || '';
-          const allergens: Allergen[] = allergensRaw === '-' 
+          const allergens: Allergen[] = (allergensRaw === '-' || !allergensRaw)
             ? [] 
             : allergensRaw.split(',')
                 .map(a => mapCsvAllergen(a))
@@ -112,9 +139,12 @@ Devuelve exclusivamente el array JSON [ ... ].`;
             category: 'Importado CSV'
           });
         }
-        processImportedList(importedList);
-        alert(`${importedList.length} productos procesados (CSV).`);
-      } catch (err) { alert('Error al procesar el archivo CSV.'); }
+        
+        if (importedList.length === 0) return alert('No se encontraron datos válidos en el CSV.');
+        
+        const { addedCount, updatedCount } = processImportedList(importedList);
+        alert(`Importación CSV finalizada:\n- ${addedCount} nuevos\n- ${updatedCount} actualizados\nTotal catálogo: ${products.length + addedCount}`);
+      } catch (err) { alert('Error al procesar el archivo CSV. Verifica que el separador sea ";"'); }
     };
     reader.readAsText(file);
     e.target.value = '';

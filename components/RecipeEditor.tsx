@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Recipe, Ingredient, ServiceDetails, SubRecipe, 
   Allergen, ALLERGEN_LIST, Product, 
@@ -6,7 +7,7 @@ import {
 } from '../types';
 import { 
   Save, X, Plus, Trash2, Image as ImageIcon, 
-  Layers, Shield, Check, Book, Utensils, Thermometer, Info, ChevronDown, ChevronUp, Link as LinkIcon, User
+  Layers, Shield, Check, Book, Utensils, Thermometer, Info, ChevronDown, ChevronUp, Link as LinkIcon, User, Sparkles, AlertTriangle, ClipboardText
 } from 'lucide-react';
 
 interface RecipeEditorProps {
@@ -41,6 +42,10 @@ export const RecipeEditor: React.FC<RecipeEditorProps> = ({ initialRecipe, produ
   const [suggestions, setSuggestions] = useState<{idx: number, list: Product[]} | null>(null);
   const [editingAllergens, setEditingAllergens] = useState<{subIndex: number, ingIndex: number} | null>(null);
   const [openDict, setOpenDict] = useState<'none' | 'cutlery' | 'temp' | 'service'>('none');
+  
+  // Estado para el importador de texto
+  const [showSmartImport, setShowSmartImport] = useState(false);
+  const [importText, setImportText] = useState('');
 
   useEffect(() => {
     if (initialRecipe) {
@@ -66,6 +71,56 @@ export const RecipeEditor: React.FC<RecipeEditorProps> = ({ initialRecipe, produ
     }
   }, [initialRecipe, settings.teacherName]);
 
+  const handleSmartImport = () => {
+    try {
+      // Limpiar el texto de posibles bloques de código markdown
+      const cleanJson = importText.replace(/```json/g, '').replace(/```/g, '').trim();
+      const data = JSON.parse(cleanJson);
+
+      if (!data.name) throw new Error("Formato no reconocido");
+
+      setName(data.name || '');
+      setCategory(data.category || settings.categories[0]);
+      setYieldQuantity(data.yieldQuantity || 1);
+      setYieldUnit(data.yieldUnit || 'Raciones');
+      setPlatingInstructions(data.platingInstructions || '');
+      setServiceDetails({
+        ...emptyServiceDetails,
+        ...(data.serviceDetails || {})
+      });
+
+      // Procesar sub-recetas y validar ingredientes
+      const processedSubs = (data.subRecipes || []).map((sub: any) => ({
+        id: `sub_${Date.now()}_${Math.random()}`,
+        name: sub.name || 'Sin nombre',
+        instructions: sub.instructions || '',
+        photo: '',
+        ingredients: (sub.ingredients || []).map((ing: any) => {
+          // Intentar vincular con base de datos por nombre
+          const match = productDatabase.find(p => p.name.toLowerCase() === ing.name.toLowerCase());
+          const qtyNum = parseFloat(ing.quantity?.toString().replace(',', '.') || '0');
+          
+          return {
+            id: `ing_${Date.now()}_${Math.random()}`,
+            name: match ? match.name : ing.name,
+            quantity: ing.quantity?.toString() || '0',
+            unit: match ? match.unit : (ing.unit || 'kg'),
+            allergens: match ? match.allergens : (ing.allergens || []),
+            pricePerUnit: match ? match.pricePerUnit : 0,
+            cost: match ? qtyNum * match.pricePerUnit : 0
+          };
+        })
+      }));
+
+      setSubRecipes(processedSubs.length > 0 ? processedSubs : subRecipes);
+      setShowSmartImport(false);
+      setImportText('');
+      alert("Receta adaptada correctamente. Revisa los ingredientes marcados.");
+    } catch (err) {
+      alert("Error: El texto pegado no tiene un formato JSON válido. Asegúrate de copiar todo el contenido que generó la IA.");
+    }
+  };
+
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, isMain: boolean, subRecipeIndex?: number) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -89,7 +144,7 @@ export const RecipeEditor: React.FC<RecipeEditorProps> = ({ initialRecipe, produ
     if (field === 'quantity') {
       const normalizedValue = value.replace(',', '.');
       ing.quantity = normalizedValue;
-      if (ing.pricePerUnit) {
+      if (ing.pricePerUnit !== undefined) {
         const qtyNum = parseFloat(normalizedValue);
         ing.cost = !isNaN(qtyNum) ? qtyNum * ing.pricePerUnit : 0;
       }
@@ -147,6 +202,11 @@ export const RecipeEditor: React.FC<RecipeEditorProps> = ({ initialRecipe, produ
     }
   };
 
+  // Comprobar si un ingrediente está en la base de datos
+  const isIngredientInDB = (ingName: string) => {
+    return productDatabase.some(p => p.name.toLowerCase() === ingName.toLowerCase());
+  };
+
   return (
     <form onSubmit={handleSubmit} className="bg-slate-100 min-h-screen pb-20">
       <div className="sticky top-0 z-40 bg-white border-b border-slate-200 px-8 py-4 shadow-sm flex justify-between items-center">
@@ -158,12 +218,57 @@ export const RecipeEditor: React.FC<RecipeEditorProps> = ({ initialRecipe, produ
             <Book size={24} className="text-amber-500"/> {initialRecipe ? 'Editar Ficha' : 'Nueva Ficha Técnica'}
           </h2>
         </div>
-        <button type="submit" className="px-8 py-3 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 flex items-center gap-2 shadow-xl transition-all font-bold uppercase text-xs">
-          <Save size={18} /> Guardar Ficha
-        </button>
+        <div className="flex gap-3">
+          <button 
+            type="button" 
+            onClick={() => setShowSmartImport(true)}
+            className="px-6 py-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 flex items-center gap-2 shadow-lg transition-all font-black uppercase text-[10px] tracking-widest"
+          >
+            <Sparkles size={18} /> Pegado Inteligente (IA)
+          </button>
+          <button type="submit" className="px-8 py-3 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 flex items-center gap-2 shadow-xl transition-all font-bold uppercase text-xs">
+            <Save size={18} /> Guardar Ficha
+          </button>
+        </div>
       </div>
 
+      {/* MODAL DE IMPORTACIÓN INTELIGENTE */}
+      {showSmartImport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-md p-4">
+          <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-2xl w-full overflow-hidden">
+            <div className="bg-indigo-600 text-white px-8 py-6 flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-black uppercase tracking-tighter flex items-center gap-2">
+                   <Sparkles /> Pegar Receta de Gemini
+                </h2>
+                <p className="text-indigo-100 text-[10px] font-bold uppercase mt-1 opacity-80">El sistema adaptará automáticamente los campos</p>
+              </div>
+              <button onClick={() => setShowSmartImport(false)} className="hover:rotate-90 transition-transform"><X size={24}/></button>
+            </div>
+            <div className="p-8 space-y-4">
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Pega aquí el código generado por la IA:</label>
+              <textarea 
+                value={importText}
+                onChange={e => setImportText(e.target.value)}
+                placeholder="Empieza con { 'name': ..."
+                className="w-full h-80 p-6 bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl font-mono text-xs focus:border-indigo-500 focus:bg-white transition-all outline-none resize-none"
+              ></textarea>
+              <div className="flex gap-3">
+                <button 
+                  type="button" 
+                  onClick={handleSmartImport}
+                  className="flex-grow bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:bg-indigo-700 transition-all"
+                >
+                  Procesar y Adaptar Receta
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto p-8 space-y-8">
+        {/* Cabecera Datos Generales */}
         <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-8 grid grid-cols-1 md:grid-cols-12 gap-10">
           <div className="md:col-span-3">
             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Foto Principal</label>
@@ -262,42 +367,50 @@ export const RecipeEditor: React.FC<RecipeEditorProps> = ({ initialRecipe, produ
                        }} className="text-xs font-bold text-indigo-600 flex items-center gap-1"><Plus size={14}/> Añadir fila</button>
                     </div>
                     <div className="space-y-2">
-                       {subRecipes[activeTab].ingredients.map((ing, iIdx) => (
-                         <div key={ing.id} className="grid grid-cols-12 gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100 group">
-                            <div className="col-span-5 relative">
-                               <input type="text" value={ing.name} onChange={e => updateIngredient(activeTab, iIdx, 'name', e.target.value)} className="w-full px-3 py-2 text-sm bg-transparent outline-none font-bold" placeholder="Nombre ingrediente..." />
-                               {suggestions && suggestions.idx === iIdx && (
-                                 <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-slate-200 shadow-2xl rounded-xl overflow-hidden max-h-60 overflow-y-auto">
-                                    {suggestions.list.map(p => (
-                                      <div key={p.id} onClick={() => selectProduct(activeTab, iIdx, p)} className="px-4 py-2.5 hover:bg-slate-50 cursor-pointer text-xs flex justify-between border-b last:border-0">
-                                         <span className="font-bold">{p.name}</span>
-                                         <span className="text-slate-400 font-mono">{p.pricePerUnit.toFixed(2)}€/{p.unit}</span>
-                                      </div>
-                                    ))}
-                                 </div>
-                               )}
-                            </div>
-                            <input 
-                              type="text" 
-                              value={ing.quantity} 
-                              onChange={e => updateIngredient(activeTab, iIdx, 'quantity', e.target.value)} 
-                              className="col-span-2 text-right px-2 py-2 text-sm bg-white border border-slate-200 rounded-lg outline-none font-mono focus:border-slate-900" 
-                              placeholder="0.000" 
-                            />
-                            <div className="col-span-1 flex items-center text-[10px] font-bold text-slate-400 uppercase">{ing.unit}</div>
-                            <div className="col-span-2 flex items-center justify-end font-mono text-xs text-indigo-600 font-bold">
-                               {ing.cost ? ing.cost.toFixed(2) + ' €' : '-'}
-                            </div>
-                            <div className="col-span-2 flex justify-end gap-1">
-                               <button type="button" onClick={() => setEditingAllergens({subIndex: activeTab, ingIndex: iIdx})} className={`p-1.5 rounded-lg ${ing.allergens.length ? 'bg-red-100 text-red-600' : 'text-slate-200 hover:text-slate-400'}`}><Shield size={16}/></button>
-                               <button type="button" onClick={() => {
-                                 const newSubs = [...subRecipes];
-                                 newSubs[activeTab].ingredients.splice(iIdx, 1);
-                                 setSubRecipes(newSubs);
-                               }} className="p-1.5 text-slate-200 hover:text-red-500"><Trash2 size={16}/></button>
-                            </div>
-                         </div>
-                       ))}
+                       {subRecipes[activeTab].ingredients.map((ing, iIdx) => {
+                         const exists = isIngredientInDB(ing.name);
+                         return (
+                           <div key={ing.id} className={`grid grid-cols-12 gap-2 p-2 rounded-xl border group transition-all ${exists ? 'bg-slate-50 border-slate-100' : 'bg-amber-50 border-amber-200'}`}>
+                              <div className="col-span-5 relative flex items-center gap-2">
+                                 {!exists && ing.name && (
+                                   <div title="Ingrediente no encontrado en Inventario. El coste será 0€." className="text-amber-500 animate-pulse">
+                                      <AlertTriangle size={18} />
+                                   </div>
+                                 )}
+                                 <input type="text" value={ing.name} onChange={e => updateIngredient(activeTab, iIdx, 'name', e.target.value)} className="w-full px-3 py-2 text-sm bg-transparent outline-none font-bold" placeholder="Nombre ingrediente..." />
+                                 {suggestions && suggestions.idx === iIdx && (
+                                   <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-slate-200 shadow-2xl rounded-xl overflow-hidden max-h-60 overflow-y-auto">
+                                      {suggestions.list.map(p => (
+                                        <div key={p.id} onClick={() => selectProduct(activeTab, iIdx, p)} className="px-4 py-2.5 hover:bg-slate-50 cursor-pointer text-xs flex justify-between border-b last:border-0">
+                                           <span className="font-bold">{p.name}</span>
+                                           <span className="text-slate-400 font-mono">{p.pricePerUnit.toFixed(2)}€/{p.unit}</span>
+                                        </div>
+                                      ))}
+                                   </div>
+                                 )}
+                              </div>
+                              <input 
+                                type="text" 
+                                value={ing.quantity} 
+                                onChange={e => updateIngredient(activeTab, iIdx, 'quantity', e.target.value)} 
+                                className="col-span-2 text-right px-2 py-2 text-sm bg-white border border-slate-200 rounded-lg outline-none font-mono focus:border-slate-900" 
+                                placeholder="0.000" 
+                              />
+                              <div className="col-span-1 flex items-center text-[10px] font-bold text-slate-400 uppercase">{ing.unit}</div>
+                              <div className="col-span-2 flex items-center justify-end font-mono text-xs text-indigo-600 font-bold">
+                                 {ing.cost ? ing.cost.toFixed(2) + ' €' : '0.00 €'}
+                              </div>
+                              <div className="col-span-2 flex justify-end gap-1">
+                                 <button type="button" onClick={() => setEditingAllergens({subIndex: activeTab, ingIndex: iIdx})} className={`p-1.5 rounded-lg ${ing.allergens.length ? 'bg-red-100 text-red-600' : 'text-slate-200 hover:text-slate-400'}`}><Shield size={16}/></button>
+                                 <button type="button" onClick={() => {
+                                   const newSubs = [...subRecipes];
+                                   newSubs[activeTab].ingredients.splice(iIdx, 1);
+                                   setSubRecipes(newSubs);
+                                 }} className="p-1.5 text-slate-200 hover:text-red-500"><Trash2 size={16}/></button>
+                              </div>
+                           </div>
+                         );
+                       })}
                     </div>
                   </div>
 
