@@ -1,3 +1,4 @@
+
 export type Allergen = 
   | 'Gluten' | 'Crustáceos' | 'Huevos' | 'Pescado' | 'Cacahuetes' 
   | 'Soja' | 'Lácteos' | 'Frutos de cáscara' | 'Apio' | 'Mostaza' 
@@ -23,6 +24,7 @@ export interface Ingredient {
   name: string;
   quantity: string; 
   unit: string;
+  category?: string; // Nueva propiedad para agrupamiento
   allergens: Allergen[];
   pricePerUnit?: number;
   cost?: number;

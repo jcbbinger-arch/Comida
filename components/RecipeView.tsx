@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState } from 'react';
-import { Recipe, AppSettings, Allergen, SERVICE_TYPES } from '../types';
-import { Printer, ArrowLeft, Info, AlertOctagon, Utensils, Thermometer, ChefHat, User, Link as LinkIcon, Users, DollarSign } from 'lucide-react';
+import { Recipe, AppSettings, Allergen, SERVICE_TYPES, Ingredient } from '../types';
+import { Printer, ArrowLeft, Info, AlertOctagon, Utensils, Thermometer, ChefHat, User, Link as LinkIcon, Users, DollarSign, Layers } from 'lucide-react';
 
 interface RecipeViewProps {
   recipe: Recipe;
@@ -37,6 +37,16 @@ export const RecipeView: React.FC<RecipeViewProps> = ({ recipe, settings, onBack
     return scaled % 1 === 0 ? scaled.toString() : scaled.toFixed(3);
   };
 
+  const groupIngredientsByFamily = (ingredients: Ingredient[]) => {
+    const groups: Record<string, Ingredient[]> = {};
+    ingredients.forEach(ing => {
+      const family = (ing.category || 'Otros').toUpperCase();
+      if (!groups[family]) groups[family] = [];
+      groups[family].push(ing);
+    });
+    return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
+  };
+
   const currentTotalCost = (recipe.totalCost || 0) * paxRatio;
   const currentCostPerPortion = currentTotalCost / dynamicPax;
 
@@ -66,7 +76,7 @@ export const RecipeView: React.FC<RecipeViewProps> = ({ recipe, settings, onBack
       </div>
 
       <div className="max-w-5xl mx-auto bg-white shadow-2xl print:shadow-none print:w-full overflow-hidden rounded-[2.5rem] print:rounded-none border border-slate-200 print:border-none">
-        {/* Cabecera Impresión */}
+        
         <div className="hidden print:flex justify-between items-center p-10 border-b-4 border-slate-900">
           <div className="w-1/3">
             {settings.instituteLogo && <img src={settings.instituteLogo} alt="IES" className="h-20 object-contain" />}
@@ -83,7 +93,6 @@ export const RecipeView: React.FC<RecipeViewProps> = ({ recipe, settings, onBack
           </div>
         </div>
 
-        {/* Cabecera Pantalla */}
         <div className="bg-slate-900 text-white p-10 print:hidden relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl -mr-32 -mt-32"></div>
           <div className="relative z-10 flex justify-between items-start">
@@ -113,7 +122,6 @@ export const RecipeView: React.FC<RecipeViewProps> = ({ recipe, settings, onBack
           </div>
         </div>
 
-        {/* Info Técnica */}
         <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-100 border-b border-slate-100 print:border-slate-900">
           <div className="p-8 flex items-start gap-5">
             <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600 print:bg-white print:border print:border-slate-900"><Utensils size={24} /></div>
@@ -169,44 +177,48 @@ export const RecipeView: React.FC<RecipeViewProps> = ({ recipe, settings, onBack
           </div>
 
           <div className="space-y-12">
-            <h2 className="text-2xl font-black text-center border-y-4 border-slate-900 py-6 uppercase tracking-[0.4em] text-slate-900 bg-slate-50 print:bg-white">Procesos de Elaboración</h2>
-            {recipe.subRecipes?.map((sub, idx) => (
-              <div key={sub.id || idx} className="border border-slate-200 rounded-[2.5rem] p-10 bg-white shadow-sm print:border-slate-900 print:p-6 break-inside-avoid">
-                <div className="flex flex-col lg:flex-row gap-12">
-                  <div className="lg:w-5/12 space-y-8">
-                    <div className="flex items-center gap-5">
-                      <span className="bg-slate-900 text-white w-10 h-10 flex items-center justify-center rounded-2xl text-sm font-black print:bg-slate-900">{idx + 1}</span>
-                      <h3 className="font-black text-xl uppercase tracking-tight text-slate-900 border-b-2 border-slate-100 pb-1">{sub.name}</h3>
+            <h2 className="text-2xl font-black text-center border-y-4 border-slate-900 py-6 uppercase tracking-[0.4em] text-slate-900 bg-slate-50 print:bg-white">Mise en Place y Procesos</h2>
+            {recipe.subRecipes?.map((sub, idx) => {
+              const groupedIngs = groupIngredientsByFamily(sub.ingredients);
+              return (
+                <div key={sub.id || idx} className="border border-slate-200 rounded-[2.5rem] p-10 bg-white shadow-sm print:border-slate-900 print:p-6 break-inside-avoid">
+                  <div className="flex flex-col lg:flex-row gap-12">
+                    <div className="lg:w-5/12 space-y-8">
+                      <div className="flex items-center gap-5">
+                        <span className="bg-slate-900 text-white w-10 h-10 flex items-center justify-center rounded-2xl text-sm font-black print:bg-slate-900">{idx + 1}</span>
+                        <h3 className="font-black text-xl uppercase tracking-tight text-slate-900 border-b-2 border-slate-100 pb-1">{sub.name}</h3>
+                      </div>
+                      
+                      <div className="bg-slate-50/50 p-6 rounded-[2rem] border border-slate-100 print:bg-white print:border-slate-900 print:p-2">
+                        {groupedIngs.map(([family, ings]) => (
+                          <div key={family} className="mb-6 last:mb-0">
+                            <div className="flex items-center gap-2 mb-2 border-b border-slate-200 pb-1">
+                              <Layers size={12} className="text-indigo-400 print:hidden" />
+                              <h4 className="text-[10px] font-black uppercase text-indigo-600 tracking-widest">{family}</h4>
+                            </div>
+                            <table className="w-full text-xs">
+                              <tbody className="divide-y divide-slate-100 print:divide-slate-200">
+                                {ings.map((ing, iIdx) => (
+                                  <tr key={ing.id || iIdx} className="hover:bg-indigo-50/50 transition-colors">
+                                    <td className="py-2.5 font-black text-slate-700 uppercase tracking-tight print:text-slate-900">{ing.name}</td>
+                                    <td className="py-2.5 text-right font-mono text-indigo-600 font-black text-sm print:text-slate-900">{scaleQuantity(ing.quantity)}</td>
+                                    <td className="py-2.5 pl-4 text-slate-400 print:text-slate-900 uppercase font-bold text-[10px]">{ing.unit}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    {sub.photo && <img src={sub.photo} className="w-full aspect-video rounded-3xl object-cover border border-slate-100 print:border-slate-900 shadow-md" alt="" />}
-                    <div className="bg-slate-50/50 p-6 rounded-[2rem] border border-slate-100 print:bg-white print:border-slate-900 print:p-2">
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="border-b-2 border-slate-900 uppercase text-[10px] font-black text-slate-400 print:text-slate-900">
-                            <th className="text-left py-3">Materia Prima</th>
-                            <th className="text-right py-3">Escalado</th>
-                            <th className="text-left py-3 pl-4">Ud.</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 print:divide-slate-200">
-                          {sub.ingredients?.map((ing, iIdx) => (
-                            <tr key={ing.id || iIdx} className="hover:bg-indigo-50/50 transition-colors">
-                              <td className="py-3.5 font-black text-slate-700 uppercase tracking-tight print:text-slate-900">{ing.name}</td>
-                              <td className="py-3.5 text-right font-mono text-indigo-600 font-black text-sm print:text-slate-900">{scaleQuantity(ing.quantity)}</td>
-                              <td className="py-3.5 pl-4 text-slate-400 print:text-slate-900 uppercase font-bold text-[10px]">{ing.unit}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                    <div className="lg:w-7/12 lg:border-l-4 border-slate-100 lg:pl-12 print:border-slate-900 print:border-l-2">
+                      <h4 className="text-[10px] font-black uppercase text-slate-400 mb-6 tracking-[0.2em] flex items-center gap-3 print:text-slate-900"><Info size={16} /> Técnica de Elaboración</h4>
+                      <div className="text-base text-slate-700 whitespace-pre-wrap leading-relaxed text-justify print:text-slate-900">{sub.instructions || "No se han descrito pasos técnicos para esta elaboración."}</div>
                     </div>
-                  </div>
-                  <div className="lg:w-7/12 lg:border-l-4 border-slate-100 lg:pl-12 print:border-slate-900 print:border-l-2">
-                    <h4 className="text-[10px] font-black uppercase text-slate-400 mb-6 tracking-[0.2em] flex items-center gap-3 print:text-slate-900"><Info size={16} /> Técnica de Elaboración</h4>
-                    <div className="text-base text-slate-700 whitespace-pre-wrap leading-relaxed text-justify print:text-slate-900">{sub.instructions || "No se han descrito pasos técnicos para esta elaboración."}</div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 

@@ -7,7 +7,7 @@ import {
 } from '../types';
 import { 
   Save, X, Plus, Trash2, Image as ImageIcon, 
-  Layers, Shield, Check, Book, Utensils, Thermometer, Info, Link as LinkIcon, User, Sparkles, AlertTriangle
+  Layers, Shield, Check, Book, Utensils, Thermometer, Info, Link as LinkIcon, User, Sparkles, AlertTriangle, PlusCircle, Database
 } from 'lucide-react';
 
 interface RecipeEditorProps {
@@ -16,6 +16,7 @@ interface RecipeEditorProps {
   settings: AppSettings;
   onSave: (recipe: Recipe) => void;
   onCancel: () => void;
+  onAddProduct: (product: Product) => void;
 }
 
 const emptyServiceDetails: ServiceDetails = {
@@ -27,7 +28,9 @@ const emptyServiceDetails: ServiceDetails = {
   clientDescription: ''
 };
 
-export const RecipeEditor: React.FC<RecipeEditorProps> = ({ initialRecipe, productDatabase, settings, onSave, onCancel }) => {
+export const RecipeEditor: React.FC<RecipeEditorProps> = ({ 
+  initialRecipe, productDatabase, settings, onSave, onCancel, onAddProduct 
+}) => {
   const [name, setName] = useState('');
   const [category, setCategory] = useState(settings.categories?.[0] || 'Otros');
   const [yieldQuantity, setYieldQuantity] = useState<number>(1);
@@ -43,6 +46,8 @@ export const RecipeEditor: React.FC<RecipeEditorProps> = ({ initialRecipe, produ
   const [editingAllergens, setEditingAllergens] = useState<{subIndex: number, ingIndex: number} | null>(null);
   const [showSmartImport, setShowSmartImport] = useState(false);
   const [importText, setImportText] = useState('');
+  
+  const [quickAdd, setQuickAdd] = useState<{subIdx: number, ingIdx: number, product: Product} | null>(null);
 
   useEffect(() => {
     if (initialRecipe) {
@@ -95,6 +100,7 @@ export const RecipeEditor: React.FC<RecipeEditorProps> = ({ initialRecipe, produ
             name: match ? match.name : ing.name,
             quantity: ing.quantity?.toString() || '0',
             unit: match ? match.unit : (ing.unit || 'kg'),
+            category: match ? match.category : (ing.category || 'Otros'),
             allergens: match ? match.allergens : (ing.allergens || []),
             pricePerUnit: match ? match.pricePerUnit : 0,
             cost: match ? qtyNum * match.pricePerUnit : 0
@@ -109,9 +115,8 @@ export const RecipeEditor: React.FC<RecipeEditorProps> = ({ initialRecipe, produ
       
       setShowSmartImport(false);
       setImportText('');
-      alert("¡Receta procesada! Revisa los ingredientes marcados con advertencia.");
     } catch (err) {
-      alert("Error al procesar: Asegúrate de que el texto contiene un objeto JSON { ... }. No importa si hay texto extra alrededor.");
+      alert("Error al procesar el JSON.");
     }
   };
 
@@ -147,6 +152,7 @@ export const RecipeEditor: React.FC<RecipeEditorProps> = ({ initialRecipe, produ
     newSubs[subIdx].ingredients[ingIdx] = {
       ...newSubs[subIdx].ingredients[ingIdx],
       name: product.name,
+      category: product.category,
       allergens: product.allergens,
       unit: product.unit,
       pricePerUnit: product.pricePerUnit,
@@ -154,6 +160,29 @@ export const RecipeEditor: React.FC<RecipeEditorProps> = ({ initialRecipe, produ
     };
     setSubRecipes(newSubs);
     setSuggestions(null);
+  };
+
+  const handleQuickAdd = (subIdx: number, ingIdx: number) => {
+    const ing = subRecipes[subIdx].ingredients[ingIdx];
+    setQuickAdd({
+      subIdx,
+      ingIdx,
+      product: {
+        id: `p_quick_${Date.now()}`,
+        name: ing.name.toUpperCase(),
+        unit: ing.unit || 'kg',
+        pricePerUnit: 0,
+        allergens: [],
+        category: 'Almacén'
+      }
+    });
+  };
+
+  const confirmQuickAdd = () => {
+    if (!quickAdd) return;
+    onAddProduct(quickAdd.product);
+    selectProduct(quickAdd.subIdx, quickAdd.ingIdx, quickAdd.product);
+    setQuickAdd(null);
   };
 
   return (
@@ -169,7 +198,7 @@ export const RecipeEditor: React.FC<RecipeEditorProps> = ({ initialRecipe, produ
           <button type="button" onClick={() => setShowSmartImport(true)} className="px-6 py-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 flex items-center gap-2 shadow-lg transition-all font-black uppercase text-[10px] tracking-widest">
             <Sparkles size={18} /> Cuadro de Pegado (IA)
           </button>
-          <button onClick={(e) => {
+          <button onClick={() => {
             const totalCost = subRecipes.reduce((acc, sub) => acc + sub.ingredients.reduce((sAcc, ing) => sAcc + (ing.cost || 0), 0), 0);
             onSave({
               id: initialRecipe?.id || Date.now().toString(),
@@ -203,6 +232,53 @@ export const RecipeEditor: React.FC<RecipeEditorProps> = ({ initialRecipe, produ
               ></textarea>
               <button onClick={handleSmartImport} className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:bg-indigo-700 transition-all">
                 Procesar y Rellenar Ficha
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {quickAdd && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/90 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="bg-white rounded-[2rem] shadow-2xl max-w-md w-full overflow-hidden">
+            <div className="bg-amber-500 text-slate-900 px-8 py-6 flex justify-between items-center">
+              <div>
+                <h2 className="text-lg font-black uppercase tracking-tighter flex items-center gap-2"><Database size={20}/> Alta Express de Inventario</h2>
+                <p className="text-[9px] font-black uppercase opacity-60">Sincronización instantánea con el catálogo maestro</p>
+              </div>
+              <button onClick={() => setQuickAdd(null)} className="hover:rotate-90 transition-transform"><X size={24}/></button>
+            </div>
+            <div className="p-8 space-y-5">
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Nombre del Género</label>
+                <input type="text" value={quickAdd.product.name} onChange={e => setQuickAdd({...quickAdd, product: {...quickAdd.product, name: e.target.value.toUpperCase()}})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold uppercase outline-none focus:ring-2 focus:ring-amber-500" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                   <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Precio Base (€)</label>
+                   <input type="number" step="any" value={quickAdd.product.pricePerUnit} onChange={e => setQuickAdd({...quickAdd, product: {...quickAdd.product, pricePerUnit: parseFloat(e.target.value) || 0}})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold outline-none focus:ring-2 focus:ring-amber-500" placeholder="0.00" />
+                </div>
+                <div>
+                   <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Unidad</label>
+                   <select value={quickAdd.product.unit} onChange={e => setQuickAdd({...quickAdd, product: {...quickAdd.product, unit: e.target.value}})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none">
+                      <option value="kg">kg</option>
+                      <option value="L">L</option>
+                      <option value="unidad">unidad</option>
+                   </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Categoría</label>
+                <select value={quickAdd.product.category} onChange={e => setQuickAdd({...quickAdd, product: {...quickAdd.product, category: e.target.value}})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none">
+                   <option value="Almacén">Almacén</option>
+                   <option value="Carnes">Carnes</option>
+                   <option value="Pescados">Pescados</option>
+                   <option value="Verduras">Verduras</option>
+                   <option value="Lácteos">Lácteos</option>
+                </select>
+              </div>
+              <button onClick={confirmQuickAdd} className="w-full bg-slate-900 text-white py-4 rounded-xl font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl">
+                 Vincular y Guardar
               </button>
             </div>
           </div>
@@ -287,7 +363,14 @@ export const RecipeEditor: React.FC<RecipeEditorProps> = ({ initialRecipe, produ
                         return (
                           <div key={ing.id} className={`grid grid-cols-12 gap-2 p-2 rounded-xl border transition-all relative ${isActiveSuggestion ? 'z-50 shadow-lg ring-2 ring-indigo-500' : 'z-auto'} ${inDB ? 'bg-slate-50 border-slate-100' : 'bg-amber-50 border-amber-200'}`}>
                              <div className="col-span-6 relative flex items-center gap-2">
-                                {!inDB && ing.name && <AlertTriangle size={16} className="text-amber-500 shrink-0" title="No vinculado al inventario (Coste 0€)" />}
+                                {!inDB && ing.name && (
+                                  <div className="flex items-center gap-1">
+                                    <AlertTriangle size={16} className="text-amber-500 shrink-0" title="No vinculado al inventario" />
+                                    <button type="button" onClick={() => handleQuickAdd(activeTab, iIdx)} className="p-1 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors shadow-sm" title="Alta rápida en Inventario">
+                                       <PlusCircle size={14}/>
+                                    </button>
+                                  </div>
+                                )}
                                 <input type="text" value={ing.name} onChange={e => updateIngredient(activeTab, iIdx, 'name', e.target.value)} className="w-full bg-transparent px-2 py-1 text-sm font-bold outline-none uppercase" placeholder="Ingrediente..." />
                                 
                                 {isActiveSuggestion && (

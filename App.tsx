@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Recipe, AppSettings, AppBackup, Product, DEFAULT_CATEGORIES } from './types';
 import { useLocalStorage } from './hooks/useLocalStorage';
@@ -99,7 +100,14 @@ function App() {
       ) : viewState === 'VIEWER' && currentRecipe ? (
         <RecipeView recipe={currentRecipe} onBack={() => setViewState('DASHBOARD')} settings={settings} />
       ) : viewState === 'EDITOR' ? (
-        <RecipeEditor initialRecipe={currentRecipe} productDatabase={productDatabase} settings={settings} onSave={handleSave} onCancel={() => setViewState('DASHBOARD')} />
+        <RecipeEditor 
+          initialRecipe={currentRecipe} 
+          productDatabase={productDatabase} 
+          settings={settings} 
+          onSave={handleSave} 
+          onCancel={() => setViewState('DASHBOARD')} 
+          onAddProduct={(p) => setProductDatabase(prev => [p, ...prev])}
+        />
       ) : viewState === 'MENU_PLANNER' ? (
         <MenuPlanner recipes={recipes} settings={settings} onBack={() => setViewState('DASHBOARD')} productDatabase={productDatabase} />
       ) : viewState === 'PRODUCT_DB' ? (
