@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useRef } from 'react';
 import { Product, Allergen, ALLERGEN_LIST } from '../types';
-import { Search, Plus, ArrowLeft, Edit2, Trash2, Save, X, Shield, Check, Download, Upload, DollarSign, Copy, FileJson } from 'lucide-react';
+import { Search, Plus, ArrowLeft, Edit2, Trash2, Save, X, Shield, Check, Download, Upload, DollarSign, Copy, FileJson, FileSpreadsheet } from 'lucide-react';
 
 interface ProductDatabaseViewerProps {
   products: Product[];
@@ -19,6 +19,7 @@ export const ProductDatabaseViewer: React.FC<ProductDatabaseViewerProps> = ({
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const csvInputRef = useRef<HTMLInputElement>(null);
 
   const filteredProducts = useMemo(() => {
     const term = searchTerm.toLowerCase();
@@ -36,6 +37,35 @@ Genera 20 productos variados y realistas. Solo devuelve el array JSON.`;
     alert('Prompt de Inventario copiado. Pégalo en Gemini para obtener la lista JSON.');
   };
 
+  const mapCsvAllergen = (csvAllergen: string): Allergen | null => {
+    const clean = csvAllergen.trim().toLowerCase();
+    if (clean === 'leche') return 'Lácteos';
+    if (clean === 'fruta de cascara' || clean === 'frutos de cascara') return 'Frutos de cáscara';
+    
+    // Buscar coincidencia en la lista oficial
+    return ALLERGEN_LIST.find(a => a.toLowerCase() === clean) || null;
+  };
+
+  const processImportedList = (importedList: any[]) => {
+    const updatedDatabase = [...products];
+    importedList.forEach((newProd: any) => {
+      const index = updatedDatabase.findIndex(p => p.name.toLowerCase() === newProd.name.toLowerCase());
+      const prodData: Product = {
+        id: index >= 0 ? updatedDatabase[index].id : `prod_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+        name: newProd.name,
+        category: newProd.category || 'Otros',
+        unit: newProd.unit || 'kg',
+        pricePerUnit: typeof newProd.pricePerUnit === 'string' 
+          ? parseFloat(newProd.pricePerUnit.replace(',', '.')) 
+          : (parseFloat(newProd.pricePerUnit) || 0),
+        allergens: Array.isArray(newProd.allergens) ? newProd.allergens : []
+      };
+      if (index >= 0) { updatedDatabase[index] = prodData; }
+      else { updatedDatabase.push(prodData); }
+    });
+    onImport(updatedDatabase);
+  };
+
   const handleImportJson = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -44,25 +74,51 @@ Genera 20 productos variados y realistas. Solo devuelve el array JSON.`;
       try {
         const importedList = JSON.parse(event.target?.result as string);
         if (!Array.isArray(importedList)) return alert('El JSON debe ser un array de productos.');
-        
-        // Lógica: Si el nombre ya existe, lo actualizamos. Si no, lo añadimos.
-        const updatedDatabase = [...products];
-        importedList.forEach((newProd: any) => {
-          const index = updatedDatabase.findIndex(p => p.name.toLowerCase() === newProd.name.toLowerCase());
-          const prodData = {
-            id: index >= 0 ? updatedDatabase[index].id : `prod_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-            name: newProd.name,
-            category: newProd.category || 'Otros',
-            unit: newProd.unit || 'kg',
-            pricePerUnit: parseFloat(newProd.pricePerUnit) || 0,
-            allergens: Array.isArray(newProd.allergens) ? newProd.allergens : []
-          };
-          if (index >= 0) { updatedDatabase[index] = prodData; }
-          else { updatedDatabase.push(prodData); }
-        });
-        onImport(updatedDatabase);
-        alert(`${importedList.length} productos procesados (actualizados o añadidos).`);
-      } catch (err) { alert('Error al procesar el archivo.'); }
+        processImportedList(importedList);
+        alert(`${importedList.length} productos procesados (JSON).`);
+      } catch (err) { alert('Error al procesar el archivo JSON.'); }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  const handleImportCsv = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result as string;
+        const lines = text.split(/\r?\n/);
+        const importedList: any[] = [];
+
+        // Ignoramos la cabecera si existe
+        const startLine = lines[0].toLowerCase().includes('nombre') ? 1 : 0;
+
+        for (let i = startLine; i < lines.length; i++) {
+          if (!lines[i].trim()) continue;
+          const cols = lines[i].split(';');
+          if (cols.length < 3) continue;
+
+          const allergensRaw = cols[3] || '';
+          const allergens: Allergen[] = allergensRaw === '-' 
+            ? [] 
+            : allergensRaw.split(',')
+                .map(a => mapCsvAllergen(a))
+                .filter((a): a is Allergen => a !== null);
+
+          importedList.push({
+            name: cols[0].trim(),
+            pricePerUnit: cols[1].trim(), // Se procesa en processImportedList
+            unit: cols[2].trim(),
+            allergens: allergens,
+            category: 'Importado CSV'
+          });
+        }
+
+        processImportedList(importedList);
+        alert(`${importedList.length} productos procesados (CSV).`);
+      } catch (err) { alert('Error al procesar el archivo CSV.'); }
     };
     reader.readAsText(file);
     e.target.value = '';
@@ -100,12 +156,19 @@ Genera 20 productos variados y realistas. Solo devuelve el array JSON.`;
             <button onClick={copyProductPrompt} className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-amber-400 rounded-xl hover:bg-slate-700 transition-all font-bold text-xs uppercase border border-slate-700">
               <Copy size={16} /> Prompt IA
             </button>
+            
             <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleImportJson} />
             <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-slate-300 rounded-xl hover:bg-slate-700 transition-all font-bold text-xs uppercase border border-slate-700">
-              <FileJson size={16} /> Importar
+              <FileJson size={16} /> JSON
             </button>
+
+            <input type="file" ref={csvInputRef} className="hidden" accept=".csv,.txt" onChange={handleImportCsv} />
+            <button onClick={() => csvInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 bg-emerald-800 text-emerald-100 rounded-xl hover:bg-emerald-700 transition-all font-bold text-xs uppercase border border-emerald-900">
+              <FileSpreadsheet size={16} /> CSV
+            </button>
+
             <button onClick={() => { setEditingProduct({ id: `p_${Date.now()}`, name: '', category: 'Almacén', unit: 'kg', pricePerUnit: 0, allergens: [] }); setIsCreating(true); }} className="flex items-center gap-2 px-6 py-2 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-all font-black text-xs uppercase tracking-widest">
-              <Plus size={18} /> Añadir Producto
+              <Plus size={18} /> Añadir
             </button>
           </div>
         </div>
