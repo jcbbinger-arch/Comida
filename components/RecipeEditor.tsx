@@ -28,6 +28,29 @@ const emptyServiceDetails: ServiceDetails = {
   clientDescription: ''
 };
 
+// Función de utilidad para parsear números en formato español (coma como decimal)
+const parseSmartNumber = (val: string | number): number => {
+  if (typeof val === 'number') return val;
+  if (!val) return 0;
+  // Limpiar espacios, símbolos de euro
+  let clean = val.toString().replace(/[€\s]/g, '');
+  // Caso 5,370 -> Queremos 5.37
+  // Si hay coma, la convertimos en punto para parseFloat
+  // Pero si hay puntos y comas (1.234,56), eliminamos el punto de miles primero
+  const hasComma = clean.includes(',');
+  const hasDot = clean.includes('.');
+
+  if (hasComma && hasDot) {
+    // Probable formato 1.234,56
+    clean = clean.replace(/\./g, '').replace(',', '.');
+  } else if (hasComma) {
+    // Probable formato 5,370
+    clean = clean.replace(',', '.');
+  }
+  
+  return parseFloat(clean) || 0;
+};
+
 export const RecipeEditor: React.FC<RecipeEditorProps> = ({ 
   initialRecipe, productDatabase, settings, onSave, onCancel, onAddProduct 
 }) => {
@@ -67,59 +90,6 @@ export const RecipeEditor: React.FC<RecipeEditorProps> = ({
     }
   }, [initialRecipe, settings.teacherName]);
 
-  const extractJson = (text: string) => {
-    const match = text.match(/\{[\s\S]*\}/);
-    if (match) return match[0];
-    return text;
-  };
-
-  const handleSmartImport = () => {
-    try {
-      const cleanText = extractJson(importText);
-      const data = JSON.parse(cleanText);
-
-      if (!data.name && !data.subRecipes) throw new Error("Formato inválido");
-
-      setName(data.name || name);
-      setCategory(data.category || category);
-      setYieldQuantity(data.yieldQuantity || yieldQuantity);
-      setYieldUnit(data.yieldUnit || yieldUnit);
-      setPlatingInstructions(data.platingInstructions || platingInstructions);
-      if (data.serviceDetails) setServiceDetails({ ...emptyServiceDetails, ...data.serviceDetails });
-
-      const processedSubs = (data.subRecipes || []).map((sub: any) => ({
-        id: `sub_${Math.random()}`,
-        name: sub.name || 'Elaboración',
-        instructions: sub.instructions || '',
-        photo: '',
-        ingredients: (sub.ingredients || []).map((ing: any) => {
-          const match = productDatabase.find(p => p.name.toLowerCase() === ing.name.toLowerCase());
-          const qtyNum = parseFloat(ing.quantity?.toString().replace(',', '.') || '0');
-          return {
-            id: `ing_${Math.random()}`,
-            name: match ? match.name : ing.name,
-            quantity: ing.quantity?.toString() || '0',
-            unit: match ? match.unit : (ing.unit || 'kg'),
-            category: match ? match.category : (ing.category || 'Otros'),
-            allergens: match ? match.allergens : (ing.allergens || []),
-            pricePerUnit: match ? match.pricePerUnit : 0,
-            cost: match ? qtyNum * match.pricePerUnit : 0
-          };
-        })
-      }));
-
-      if (processedSubs.length > 0) {
-        setSubRecipes(processedSubs);
-        setActiveTab(0);
-      }
-      
-      setShowSmartImport(false);
-      setImportText('');
-    } catch (err) {
-      alert("Error al procesar el JSON.");
-    }
-  };
-
   const isIngredientInDB = (ingName: string) => {
     return productDatabase.some(p => p.name.toLowerCase() === ingName.toLowerCase());
   };
@@ -128,10 +98,10 @@ export const RecipeEditor: React.FC<RecipeEditorProps> = ({
     const newSubs = [...subRecipes];
     const ing = newSubs[subIdx].ingredients[ingIdx];
     if (field === 'quantity') {
-      const normalizedValue = value.replace(',', '.');
-      ing.quantity = normalizedValue;
+      const parsedVal = value.toString().replace(',', '.');
+      ing.quantity = parsedVal;
       if (ing.pricePerUnit !== undefined) {
-        const qtyNum = parseFloat(normalizedValue);
+        const qtyNum = parseFloat(parsedVal);
         ing.cost = !isNaN(qtyNum) ? qtyNum * ing.pricePerUnit : 0;
       }
     } else { (ing as any)[field] = value; }
@@ -192,8 +162,13 @@ export const RecipeEditor: React.FC<RecipeEditorProps> = ({
 
   const confirmQuickAdd = () => {
     if (!quickAdd) return;
-    onAddProduct(quickAdd.product);
-    selectProduct(quickAdd.subIdx, quickAdd.ingIdx, quickAdd.product);
+    // Asegurar que el precio está bien parseado antes de guardar
+    const finalProduct = {
+      ...quickAdd.product,
+      pricePerUnit: parseSmartNumber(quickAdd.product.pricePerUnit)
+    };
+    onAddProduct(finalProduct);
+    selectProduct(quickAdd.subIdx, quickAdd.ingIdx, finalProduct);
     setQuickAdd(null);
   };
 
@@ -207,9 +182,6 @@ export const RecipeEditor: React.FC<RecipeEditorProps> = ({
           </h2>
         </div>
         <div className="flex gap-3">
-          <button type="button" onClick={() => setShowSmartImport(true)} className="px-6 py-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 flex items-center gap-2 shadow-lg transition-all font-black uppercase text-[10px] tracking-widest">
-            <Sparkles size={18} /> Cuadro de Pegado (IA)
-          </button>
           <button onClick={() => {
             const totalCost = subRecipes.reduce((acc, sub) => acc + sub.ingredients.reduce((sAcc, ing) => sAcc + (ing.cost || 0), 0), 0);
             onSave({
@@ -225,32 +197,7 @@ export const RecipeEditor: React.FC<RecipeEditorProps> = ({
         </div>
       </div>
 
-      {showSmartImport && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-md p-4 animate-fadeIn">
-          <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-2xl w-full overflow-hidden">
-            <div className="bg-indigo-600 text-white px-8 py-6 flex justify-between items-center">
-              <div>
-                <h2 className="text-xl font-black uppercase tracking-tighter flex items-center gap-2"><Sparkles /> Importador por Texto</h2>
-                <p className="text-indigo-100 text-[10px] font-bold uppercase mt-1">Pega el texto de Gemini y el sistema extraerá los datos</p>
-              </div>
-              <button onClick={() => setShowSmartImport(false)}><X size={24}/></button>
-            </div>
-            <div className="p-8 space-y-4">
-              <textarea 
-                value={importText}
-                onChange={e => setImportText(e.target.value)}
-                placeholder="Pega aquí todo el texto que te dio la IA..."
-                className="w-full h-80 p-6 bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl font-mono text-xs focus:border-indigo-500 transition-all outline-none resize-none shadow-inner"
-              ></textarea>
-              <button onClick={handleSmartImport} className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:bg-indigo-700 transition-all">
-                Procesar y Rellenar Ficha
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Alta Express de Producto - ACTUALIZADO CON ALÉRGENOS */}
+      {/* Modal Alta Express de Producto - ACTUALIZADO CON ALÉRGENOS Y FIX DE PRECIOS */}
       {quickAdd && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/90 backdrop-blur-sm p-4 animate-fadeIn">
           <div className="bg-white rounded-[2rem] shadow-2xl max-w-lg w-full overflow-hidden">
@@ -269,7 +216,14 @@ export const RecipeEditor: React.FC<RecipeEditorProps> = ({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Precio Base (€)</label>
-                   <input type="number" step="any" value={quickAdd.product.pricePerUnit} onChange={e => setQuickAdd({...quickAdd, product: {...quickAdd.product, pricePerUnit: parseFloat(e.target.value) || 0}})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold outline-none focus:ring-2 focus:ring-amber-500" placeholder="0.00" />
+                   <input 
+                    type="text" 
+                    value={quickAdd.product.pricePerUnit} 
+                    onChange={e => setQuickAdd({...quickAdd, product: {...quickAdd.product, pricePerUnit: e.target.value as any}})} 
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold outline-none focus:ring-2 focus:ring-amber-500" 
+                    placeholder="Ej: 5,37" 
+                   />
+                   <p className="text-[9px] text-slate-400 mt-1 italic">Usa coma para decimales si prefieres (ej: 5,37)</p>
                 </div>
                 <div>
                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Unidad</label>
@@ -288,10 +242,11 @@ export const RecipeEditor: React.FC<RecipeEditorProps> = ({
                    <option value="Pescados">Pescados</option>
                    <option value="Verduras">Verduras</option>
                    <option value="Lácteos">Lácteos</option>
+                   <option value="Frutas">Frutas</option>
+                   <option value="Especias">Especias</option>
                 </select>
               </div>
 
-              {/* Selector de Alérgenos añadido */}
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest flex items-center gap-2">
                    <Shield size={12} className="text-red-500"/> Declaración de Alérgenos

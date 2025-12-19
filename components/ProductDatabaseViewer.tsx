@@ -12,6 +12,26 @@ interface ProductDatabaseViewerProps {
   onImport: (products: Product[]) => void;
 }
 
+// Función de utilidad mejorada para detectar formato numérico ES
+const parseSmartPrice = (val: any): number => {
+  if (typeof val === 'number') return val;
+  if (!val) return 0;
+  let s = val.toString().trim().replace(/[€\s]/g, '');
+  
+  const lastComma = s.lastIndexOf(',');
+  const lastDot = s.lastIndexOf('.');
+
+  if (lastComma > lastDot) {
+    // Caso 1.234,56 o simplemente 5,37
+    s = s.replace(/\./g, '').replace(',', '.');
+  } else if (lastDot > lastComma) {
+    // Caso 1,234.56 o 5.37
+    s = s.replace(/,/g, '');
+  }
+  
+  return parseFloat(s) || 0;
+};
+
 export const ProductDatabaseViewer: React.FC<ProductDatabaseViewerProps> = ({ 
   products, onBack, onAdd, onEdit, onDelete, onImport
 }) => {
@@ -28,23 +48,6 @@ export const ProductDatabaseViewer: React.FC<ProductDatabaseViewerProps> = ({
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [products, searchTerm]);
 
-  const copyProductPrompt = () => {
-    const prompt = `ACTÚA COMO UN GENERADOR DE DATOS JSON PURO. NO ESCRIBAS EXPLICACIONES, NO USES BLOQUES DE CÓDIGO (\`\`\`).
-Genera una lista de productos en formato JSON.
-ESTRUCTURA: [ { "name": "Nombre", "category": "familia", "unit": "kg/L/unidad", "pricePerUnit": 0.00, "allergens": [] } ]
-REGLA DE ALÉRGENOS: Usa solo: Gluten, Crustáceos, Huevos, Pescado, Cacahuetes, Soja, Lácteos, Frutos de cáscara, Apio, Mostaza, Sésamo, Sulfitos, Altramuces, Moluscos.
-Devuelve exclusivamente el array JSON [ ... ].`;
-    navigator.clipboard.writeText(prompt);
-    alert('Prompt de Inventario copiado. Úsalo en Gemini para obtener el JSON directo.');
-  };
-
-  const mapCsvAllergen = (csvAllergen: string): Allergen | null => {
-    const clean = csvAllergen.trim().toLowerCase();
-    if (clean === 'leche') return 'Lácteos';
-    if (clean === 'fruta de cascara' || clean === 'frutos de cascara') return 'Frutos de cáscara';
-    return ALLERGEN_LIST.find(a => a.toLowerCase() === clean) || null;
-  };
-
   const processImportedList = (importedList: any[]) => {
     const updatedDatabase = [...products];
     let addedCount = 0;
@@ -54,9 +57,7 @@ Devuelve exclusivamente el array JSON [ ... ].`;
       const cleanName = newProd.name.trim();
       const index = updatedDatabase.findIndex(p => p.name.trim().toLowerCase() === cleanName.toLowerCase());
       
-      const price = typeof newProd.pricePerUnit === 'string' 
-        ? parseFloat(newProd.pricePerUnit.replace(',', '.')) 
-        : (parseFloat(newProd.pricePerUnit) || 0);
+      const price = parseSmartPrice(newProd.pricePerUnit);
 
       const prodData: Product = {
         id: index >= 0 ? updatedDatabase[index].id : `prod_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
@@ -80,66 +81,18 @@ Devuelve exclusivamente el array JSON [ ... ].`;
     return { addedCount, updatedCount };
   };
 
-  const handleImportJson = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const importedList = JSON.parse(event.target?.result as string);
-        if (!Array.isArray(importedList)) return alert('El JSON debe ser un array de productos.');
-        const { addedCount, updatedCount } = processImportedList(importedList);
-        alert(`Importación JSON finalizada:\n- ${addedCount} nuevos\n- ${updatedCount} actualizados`);
-      } catch (err) { alert('Error al procesar el archivo JSON.'); }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
-  };
-
-  const handleImportCsv = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const text = event.target?.result as string;
-        const lines = text.split(/\r?\n/);
-        const importedList: any[] = [];
-        const startLine = lines[0].toLowerCase().includes('nombre') || lines[0].toLowerCase().includes('iva') ? 1 : 0;
-
-        for (let i = startLine; i < lines.length; i++) {
-          const line = lines[i].trim();
-          if (!line) continue;
-          const cols = line.split(';');
-          if (cols.length < 3) continue;
-          const allergensRaw = cols[3] || '';
-          const allergens: Allergen[] = (allergensRaw === '-' || !allergensRaw)
-            ? [] 
-            : allergensRaw.split(',')
-                .map(a => mapCsvAllergen(a))
-                .filter((a): a is Allergen => a !== null);
-          importedList.push({
-            name: cols[0].trim(),
-            pricePerUnit: cols[1].trim(),
-            unit: cols[2].trim(),
-            allergens: allergens,
-            category: 'Importado CSV'
-          });
-        }
-        if (importedList.length === 0) return alert('No se encontraron datos válidos.');
-        const { addedCount, updatedCount } = processImportedList(importedList);
-        alert(`Importación CSV finalizada:\n- ${addedCount} nuevos\n- ${updatedCount} actualizados`);
-      } catch (err) { alert('Error al procesar el archivo CSV.'); }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
-  };
-
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProduct) return;
-    if (isCreating) onAdd(editingProduct);
-    else onEdit(editingProduct);
+    
+    // Asegurar parseo correcto del precio al guardar manualmente
+    const finalProduct = {
+      ...editingProduct,
+      pricePerUnit: parseSmartPrice(editingProduct.pricePerUnit)
+    };
+
+    if (isCreating) onAdd(finalProduct);
+    else onEdit(finalProduct);
     setEditingProduct(null);
   };
 
@@ -169,20 +122,6 @@ Devuelve exclusivamente el array JSON [ ... ].`;
             </div>
           </div>
           <div className="flex gap-2 w-full md:w-auto flex-wrap">
-            <button onClick={copyProductPrompt} className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-amber-400 rounded-xl hover:bg-slate-700 transition-all font-bold text-xs uppercase border border-slate-700">
-              <Copy size={16} /> Prompt IA
-            </button>
-            
-            <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleImportJson} />
-            <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-slate-300 rounded-xl hover:bg-slate-700 transition-all font-bold text-xs uppercase border border-slate-700">
-              <FileJson size={16} /> JSON
-            </button>
-
-            <input type="file" ref={csvInputRef} className="hidden" accept=".csv,.txt" onChange={handleImportCsv} />
-            <button onClick={() => csvInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 bg-emerald-800 text-emerald-100 rounded-xl hover:bg-emerald-700 transition-all font-bold text-xs uppercase border border-emerald-900">
-              <FileSpreadsheet size={16} /> CSV
-            </button>
-
             <button onClick={() => { setEditingProduct({ id: `p_${Date.now()}`, name: '', category: 'Almacén', unit: 'kg', pricePerUnit: 0, allergens: [] }); setIsCreating(true); }} className="flex items-center gap-2 px-6 py-2 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-all font-black text-xs uppercase tracking-widest">
               <Plus size={18} /> Añadir
             </button>
@@ -243,16 +182,6 @@ Devuelve exclusivamente el array JSON [ ... ].`;
                   </td>
                 </tr>
               ))}
-              {filteredProducts.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-6 py-20 text-center">
-                    <div className="flex flex-col items-center gap-3 text-slate-300">
-                      <Search size={48} className="opacity-10" />
-                      <p className="font-black uppercase tracking-widest text-xs">No se encontraron productos en el catálogo</p>
-                    </div>
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
@@ -272,9 +201,15 @@ Devuelve exclusivamente el array JSON [ ... ].`;
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Precio €/{editingProduct.unit}</label>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Precio € (Usa coma para decimales)</label>
                   <div className="relative">
-                    <input type="number" step="any" value={editingProduct.pricePerUnit} onChange={e => setEditingProduct({...editingProduct, pricePerUnit: parseFloat(e.target.value) || 0})} className="w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-2xl font-mono font-bold outline-none focus:ring-2 focus:ring-slate-900" />
+                    <input 
+                      type="text" 
+                      value={editingProduct.pricePerUnit} 
+                      onChange={e => setEditingProduct({...editingProduct, pricePerUnit: e.target.value as any})} 
+                      className="w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-2xl font-mono font-bold outline-none focus:ring-2 focus:ring-slate-900" 
+                      placeholder="Ej: 5,37"
+                    />
                     <DollarSign className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" size={16}/>
                   </div>
                 </div>
