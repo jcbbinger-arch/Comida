@@ -9,9 +9,10 @@ import { SettingsModal } from './components/SettingsModal';
 import { MenuPlanner } from './components/MenuPlanner';
 import { ProductDatabaseViewer } from './components/ProductDatabaseViewer';
 import { LandingPage } from './components/LandingPage';
+import { AIBridge } from './components/AIBridge';
 import { INITIAL_PRODUCT_DATABASE } from './data/products';
 
-type ViewState = 'LANDING' | 'DASHBOARD' | 'EDITOR' | 'VIEWER' | 'MENU_PLANNER' | 'PRODUCT_DB';
+type ViewState = 'LANDING' | 'DASHBOARD' | 'EDITOR' | 'VIEWER' | 'MENU_PLANNER' | 'PRODUCT_DB' | 'AI_BRIDGE';
 
 const defaultSettings: AppSettings = {
   teacherName: "Juan Codina Barranco",
@@ -109,6 +110,15 @@ function App() {
           onCancel={() => setViewState('DASHBOARD')} 
           onAddProduct={(p) => setProductDatabase(prev => [p, ...prev])}
         />
+      ) : viewState === 'AI_BRIDGE' ? (
+        <AIBridge 
+          settings={settings}
+          onBack={() => setViewState('DASHBOARD')}
+          onImport={(recipe) => {
+            handleSave(recipe);
+            setViewState('DASHBOARD');
+          }}
+        />
       ) : viewState === 'MENU_PLANNER' ? (
         <MenuPlanner 
           recipes={recipes} 
@@ -132,7 +142,20 @@ function App() {
       ) : viewState === 'PRODUCT_DB' ? (
         <ProductDatabaseViewer products={productDatabase} onBack={() => setViewState('DASHBOARD')} onAdd={(p) => setProductDatabase([p, ...productDatabase])} onEdit={(p) => setProductDatabase(productDatabase.map(old => old.id === p.id ? p : old))} onDelete={(id) => setProductDatabase(productDatabase.filter(p => p.id !== id))} onImport={(list) => setProductDatabase([...list])} />
       ) : (
-        <Dashboard recipes={recipes} settings={settings} onNew={handleCreateNew} onEdit={handleEdit} onView={handleView} onDelete={(id) => setRecipes(recipes.filter(r => r.id !== id))} onImport={(r) => setRecipes([r, ...recipes])} onOpenSettings={() => setIsSettingsOpen(true)} onOpenMenuPlanner={() => setViewState('MENU_PLANNER')} onOpenProductDB={() => setViewState('PRODUCT_DB')} onLogout={handleLogout} />
+        <Dashboard 
+          recipes={recipes} 
+          settings={settings} 
+          onNew={handleCreateNew} 
+          onEdit={handleEdit} 
+          onView={handleView} 
+          onDelete={(id) => setRecipes(recipes.filter(r => r.id !== id))} 
+          onImport={(r) => setRecipes([r, ...recipes])} 
+          onOpenSettings={() => setIsSettingsOpen(true)} 
+          onOpenMenuPlanner={() => setViewState('MENU_PLANNER')} 
+          onOpenProductDB={() => setViewState('PRODUCT_DB')} 
+          onOpenAIBridge={() => setViewState('AI_BRIDGE')}
+          onLogout={handleLogout} 
+        />
       )}
     </>
   );

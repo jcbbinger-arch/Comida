@@ -1,7 +1,7 @@
 
 import React, { useState, useRef } from 'react';
 import { Recipe, AppSettings, Allergen } from '../types';
-import { Plus, Search, Eye, Edit2, Trash2, Download, ChefHat, Settings, Calendar, Database, LogOut, Copy, FileJson } from 'lucide-react';
+import { Plus, Search, Eye, Edit2, Trash2, Download, ChefHat, Settings, Calendar, Database, LogOut, Copy, FileJson, Sparkles } from 'lucide-react';
 
 interface DashboardProps {
   recipes: Recipe[];
@@ -14,48 +14,17 @@ interface DashboardProps {
   onOpenSettings: () => void;
   onOpenMenuPlanner: () => void;
   onOpenProductDB: () => void;
+  onOpenAIBridge: () => void;
   onLogout: () => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ 
-  recipes, settings, onNew, onEdit, onView, onDelete, onImport, onOpenSettings, onOpenMenuPlanner, onOpenProductDB, onLogout
+  recipes, settings, onNew, onEdit, onView, onDelete, onImport, onOpenSettings, onOpenMenuPlanner, onOpenProductDB, onOpenAIBridge, onLogout
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const filteredRecipes = recipes.filter(r => r.name.toLowerCase().includes(searchTerm.toLowerCase()) || r.category.toLowerCase().includes(searchTerm.toLowerCase()));
-
-  const copyRecipePrompt = () => {
-    const prompt = `ACTÚA COMO UN EXPERTO EN COCINA Y GENERADOR DE DATOS JSON. 
-Genera la ficha técnica para: [NOMBRE DE LA RECETA].
-REGLA DE ORO: Devuelve EXCLUSIVAMENTE el objeto JSON entre llaves { }. No escribas nada más.
-
-Estructura requerida:
-{
-  "name": "Nombre de la receta",
-  "category": "Categoría",
-  "yieldQuantity": 10,
-  "yieldUnit": "Raciones",
-  "subRecipes": [
-    {
-      "name": "Nombre de la elaboración",
-      "ingredients": [
-        { "name": "Ingrediente exacto", "quantity": "0.500", "unit": "kg", "allergens": [] }
-      ],
-      "instructions": "Pasos detallados..."
-    }
-  ],
-  "platingInstructions": "Instrucciones de montaje...",
-  "serviceDetails": {
-    "serviceType": "Servicio a la Americana",
-    "cutlery": "Marcaje necesario...",
-    "servingTemp": "75ºC",
-    "clientDescription": "Descripción comercial para carta..."
-  }
-}`;
-    navigator.clipboard.writeText(prompt);
-    alert('Prompt Maestro copiado. Pégalo en Gemini y luego usa el "Cuadro de Pegado" en el editor.');
-  };
 
   const handleImportClick = () => fileInputRef.current?.click();
 
@@ -100,19 +69,19 @@ Estructura requerida:
             </div>
             
             <div className="flex gap-2 flex-wrap justify-center">
-              <button onClick={onOpenSettings} className="p-3 bg-slate-800 border border-slate-700 hover:bg-slate-700 rounded-xl transition-all text-slate-400 hover:text-white"><Settings size={20} /></button>
-              <button onClick={onOpenProductDB} className="p-3 bg-slate-800 border border-slate-700 hover:bg-slate-700 rounded-xl transition-all text-slate-400 hover:text-white"><Database size={20} /></button>
+              <button onClick={onOpenSettings} className="p-3 bg-slate-800 border border-slate-700 hover:bg-slate-700 rounded-xl transition-all text-slate-400 hover:text-white" title="Configuración"><Settings size={20} /></button>
+              <button onClick={onOpenProductDB} className="p-3 bg-slate-800 border border-slate-700 hover:bg-slate-700 rounded-xl transition-all text-slate-400 hover:text-white" title="Inventario Maestro"><Database size={20} /></button>
               <button onClick={onOpenMenuPlanner} className="flex items-center gap-2 px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl shadow-lg transition-all uppercase text-[10px] tracking-widest"><Calendar size={18}/> Menú del Día</button>
               
               <div className="h-10 w-px bg-slate-700 mx-2"></div>
 
-              <button onClick={copyRecipePrompt} className="flex items-center gap-2 px-5 py-3 bg-slate-800 border border-slate-700 hover:bg-slate-700 rounded-xl transition-all text-amber-400 font-black text-[10px] uppercase tracking-widest">
-                <Copy size={16} /> Prompt IA
+              <button onClick={onOpenAIBridge} className="flex items-center gap-2 px-5 py-3 bg-slate-950 border border-amber-500/30 hover:border-amber-500 hover:bg-slate-900 rounded-xl transition-all text-amber-400 font-black text-[10px] uppercase tracking-widest shadow-[0_0_15px_rgba(245,158,11,0.1)]">
+                <Sparkles size={16} /> Puente IA
               </button>
               
               <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleFileChange} />
               <button onClick={handleImportClick} className="flex items-center gap-2 px-5 py-3 bg-slate-800 border border-slate-700 hover:bg-slate-700 rounded-xl transition-all text-slate-300 font-black text-[10px] uppercase tracking-widest">
-                <FileJson size={18}/> Importar
+                <FileJson size={18}/> Importar JSON
               </button>
               
               <button onClick={onNew} className="flex items-center gap-2 px-8 py-3 bg-amber-500 hover:bg-amber-600 text-slate-900 font-black rounded-xl shadow-xl transition-all uppercase text-[10px] tracking-widest">
@@ -130,7 +99,7 @@ Estructura requerida:
 
       <div className="max-w-7xl mx-auto px-4 mt-12">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredRecipes.map(recipe => {
+          {filteredRecipes.length > 0 ? filteredRecipes.map(recipe => {
             const costPerPortion = recipe.totalCost && recipe.yieldQuantity ? (recipe.totalCost / recipe.yieldQuantity).toFixed(2) : '0.00';
             return (
               <div key={recipe.id} className="bg-white rounded-[2rem] shadow-sm hover:shadow-2xl transition-all duration-500 border border-slate-100 overflow-hidden flex flex-col group">
@@ -161,7 +130,12 @@ Estructura requerida:
                 </div>
               </div>
             );
-          })}
+          }) : (
+            <div className="col-span-full py-20 text-center">
+               <ChefHat size={64} className="mx-auto text-slate-200 mb-4" strokeWidth={1} />
+               <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">No hay fichas técnicas registradas</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
