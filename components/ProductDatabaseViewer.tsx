@@ -12,7 +12,6 @@ interface ProductDatabaseViewerProps {
   onImport: (products: Product[]) => void;
 }
 
-// Mapeo de códigos de alérgenos para CSV (Seguimos el estándar del archivo proporcionado)
 const ALLERGEN_CODE_MAP: Record<string, Allergen> = {
   'GLU': 'Gluten', 'CRU': 'Crustáceos', 'HUE': 'Huevos', 'PES': 'Pescado',
   'CAC': 'Cacahuetes', 'SOY': 'Soja', 'LAC': 'Lácteos', 'FRA': 'Frutos de cáscara',
@@ -26,16 +25,10 @@ const parseSmartPrice = (val: any): number => {
   if (typeof val === 'number') return val;
   if (!val || val === 'precio_no_disponible') return 0;
   let s = val.toString().trim().replace(/[€\s]/g, '');
-  
   const lastComma = s.lastIndexOf(',');
   const lastDot = s.lastIndexOf('.');
-
-  if (lastComma > lastDot) {
-    s = s.replace(/\./g, '').replace(',', '.');
-  } else if (lastDot > lastComma) {
-    s = s.replace(/,/g, '');
-  }
-  
+  if (lastComma > lastDot) s = s.replace(/\./g, '').replace(',', '.');
+  else if (lastDot > lastComma) s = s.replace(/,/g, '');
   return parseFloat(s) || 0;
 };
 
@@ -57,7 +50,6 @@ export const ProductDatabaseViewer: React.FC<ProductDatabaseViewerProps> = ({
   }, [products, searchTerm]);
 
   const handleExportCSV = () => {
-    // Formato exacto solicitado: Familia,Nombre,Precio (€),Unidad,Alergenos
     const headers = "Familia,Nombre,Precio (€),Unidad,Alergenos";
     const rows = products.map(p => {
       const allergenCodes = (p.allergens || []).map(a => REVERSE_ALLERGEN_MAP[a] || a).join('|');
@@ -66,7 +58,6 @@ export const ProductDatabaseViewer: React.FC<ProductDatabaseViewerProps> = ({
       const family = (p.category || 'Varios').includes(',') ? `"${p.category}"` : p.category || 'Varios';
       return `${family},${name},${price},${p.unit},${allergenCodes}`;
     });
-    
     const csvContent = [headers, ...rows].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -84,22 +75,25 @@ export const ProductDatabaseViewer: React.FC<ProductDatabaseViewerProps> = ({
       try {
         const text = event.target?.result as string;
         const lines = text.split(/\r?\n/).filter(line => line.trim() !== "");
-        // Saltamos la cabecera (Familia,Nombre,Precio (€),Unidad,Alergenos)
         const dataLines = lines.slice(1);
         
         const newProducts: Product[] = dataLines.map((line, index) => {
-          // Implementación simplificada para el formato específico
-          // Manejamos comillas si existen en el nombre o familia
-          const regex = /(".*?"|[^,]+|(?<=,)(?=,)|(?<=,)$)/g;
-          const matches = line.match(regex);
-          
-          if (!matches || matches.length < 4) return null;
+          // Regex mejorada para manejar comas dentro de comillas
+          const parts = line.match(/(".*?"|[^,]+|(?<=,)(?=,)|(?<=,)$)/g);
+          if (!parts || parts.length < 4) return null;
 
-          const family = matches[0].replace(/^"|"$/g, '').trim();
-          const name = matches[1].replace(/^"|"$/g, '').trim();
-          const priceRaw = matches[2].trim();
-          const unit = matches[3].trim();
-          const allergensRaw = matches[4] ? matches[4].trim() : "";
+          const family = parts[0].replace(/^"|"$/g, '').trim();
+          let name = parts[1].replace(/^"|"$/g, '').trim();
+          const priceRaw = parts[2].trim();
+          const unit = parts[3].trim();
+          const allergensRaw = parts[4] ? parts[4].trim() : "";
+
+          // Si por error el nombre incluye la familia al principio (limpieza de seguridad)
+          if (name.toUpperCase().startsWith(family.toUpperCase() + ",")) {
+            name = name.substring(family.length + 1).trim();
+          } else if (name.toUpperCase().startsWith(family.toUpperCase() + " ")) {
+            name = name.substring(family.length + 1).trim();
+          }
 
           const allergens: Allergen[] = allergensRaw.split('|')
             .filter(code => code.trim() !== "")
@@ -111,11 +105,10 @@ export const ProductDatabaseViewer: React.FC<ProductDatabaseViewerProps> = ({
             pricePerUnit: parseSmartPrice(priceRaw),
             unit: (unit || 'kg').trim(),
             allergens: allergens,
-            category: family
+            category: family.toUpperCase()
           };
         }).filter(p => p !== null) as Product[];
 
-        // Sincronización: Actualizar si existe por nombre, si no añadir
         const updatedDatabase = [...products];
         newProducts.forEach(newP => {
           const idx = updatedDatabase.findIndex(p => p.name.toLowerCase() === newP.name.toLowerCase());
@@ -129,20 +122,17 @@ export const ProductDatabaseViewer: React.FC<ProductDatabaseViewerProps> = ({
         onImport(updatedDatabase);
         alert(`Sincronización completada: ${newProducts.length} productos procesados.`);
       } catch (err) {
-        alert("Error crítico al procesar el CSV. Asegúrate de que el formato sea: Familia,Nombre,Precio (€),Unidad,Alergenos");
+        alert("Error al procesar CSV. Formato esperado: Familia,Nombre,Precio,Unidad,Alergenos");
       }
     };
     reader.readAsText(file);
     e.target.value = '';
   };
 
-  // Fix: added missing toggleAllergen function to manage allergen selection in the editor
   const toggleAllergen = (allergen: Allergen) => {
     if (!editingProduct) return;
     const current = editingProduct.allergens || [];
-    const updated = current.includes(allergen) 
-      ? current.filter(a => a !== allergen) 
-      : [...current, allergen];
+    const updated = current.includes(allergen) ? current.filter(a => a !== allergen) : [...current, allergen];
     setEditingProduct({ ...editingProduct, allergens: updated });
   };
 
@@ -163,7 +153,7 @@ export const ProductDatabaseViewer: React.FC<ProductDatabaseViewerProps> = ({
       onImport([]);
       setShowDeleteAllModal(false);
       setDeleteConfirmationText('');
-      alert("Base de datos de productos eliminada.");
+      alert("Base de datos vaciada.");
     }
   };
 
@@ -193,14 +183,10 @@ export const ProductDatabaseViewer: React.FC<ProductDatabaseViewerProps> = ({
             <button onClick={handleExportCSV} className="flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl hover:bg-emerald-600 hover:text-white transition-all font-black text-[10px] uppercase tracking-widest shadow-sm">
               <FileSpreadsheet size={16} /> Exportar CSV
             </button>
-            <button 
-              onClick={() => setShowDeleteAllModal(true)} 
-              disabled={products.length === 0}
-              className="flex items-center gap-2 px-4 py-2 bg-rose-50 border border-rose-200 text-rose-600 rounded-xl hover:bg-rose-600 hover:text-white transition-all font-black text-[10px] uppercase tracking-widest shadow-sm disabled:opacity-30"
-            >
+            <button onClick={() => setShowDeleteAllModal(true)} disabled={products.length === 0} className="flex items-center gap-2 px-4 py-2 bg-rose-50 border border-rose-200 text-rose-600 rounded-xl hover:bg-rose-600 hover:text-white transition-all font-black text-[10px] uppercase tracking-widest shadow-sm disabled:opacity-30">
               <Trash2 size={16} /> Vaciar Base
             </button>
-            <button onClick={() => { setEditingProduct({ id: `p_${Date.now()}`, name: '', category: 'Almacén', unit: 'kg', pricePerUnit: 0, allergens: [] }); setIsCreating(true); }} className="flex items-center gap-2 px-6 py-2 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-all font-black text-[10px] uppercase tracking-widest shadow-lg ml-auto md:ml-0">
+            <button onClick={() => { setEditingProduct({ id: `p_${Date.now()}`, name: '', category: 'ALMACÉN', unit: 'kg', pricePerUnit: 0, allergens: [] }); setIsCreating(true); }} className="flex items-center gap-2 px-6 py-2 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-all font-black text-[10px] uppercase tracking-widest shadow-lg ml-auto md:ml-0">
               <Plus size={18} /> Nuevo Item
             </button>
           </div>
@@ -218,8 +204,7 @@ export const ProductDatabaseViewer: React.FC<ProductDatabaseViewerProps> = ({
             <thead className="bg-slate-50 border-b border-slate-100 text-slate-400 uppercase text-[9px] font-black tracking-widest">
               <tr>
                 <th className="px-6 py-4 w-16">Nº</th>
-                <th className="px-6 py-4">Familia</th>
-                <th className="px-6 py-4">Nombre / Género</th>
+                <th className="px-6 py-4">Género / Materia Prima</th>
                 <th className="px-6 py-4">P. Mercado</th>
                 <th className="px-6 py-4">Ud.</th>
                 <th className="px-6 py-4">Alérgenos</th>
@@ -230,23 +215,23 @@ export const ProductDatabaseViewer: React.FC<ProductDatabaseViewerProps> = ({
               {filteredProducts.length > 0 ? filteredProducts.map((product, idx) => (
                 <tr key={product.id} className="hover:bg-indigo-50/30 transition-colors group">
                   <td className="px-6 py-4">
-                    <span className="text-[10px] font-black text-slate-300">{idx + 1}</span>
+                    <span className="text-[10px] font-black text-slate-300 bg-slate-100 w-8 h-8 flex items-center justify-center rounded-full">{idx + 1}</span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="text-[10px] font-black bg-slate-100 text-slate-500 px-2 py-1 rounded uppercase tracking-tighter">{product.category || 'Varios'}</span>
-                  </td>
-                  <td className="px-6 py-4 font-black text-slate-800 uppercase text-xs tracking-tight">
-                    {product.name}
+                    <div className="flex flex-col">
+                       <span className="font-black text-slate-800 uppercase text-xs tracking-tight">{product.name}</span>
+                       <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest opacity-70">{product.category || 'VARIOS'}</span>
+                    </div>
                   </td>
                   <td className="px-6 py-4 font-mono font-bold text-indigo-600">
-                    {product.pricePerUnit === 0 ? <span className="text-[10px] text-slate-400">N/D</span> : `${product.pricePerUnit.toFixed(3)}€`}
+                    {product.pricePerUnit === 0 ? <span className="text-[10px] text-slate-300">N/D</span> : `${product.pricePerUnit.toFixed(3)}€`}
                   </td>
                   <td className="px-6 py-4 text-slate-400 font-black uppercase text-[10px]">{product.unit}</td>
                   <td className="px-6 py-4">
                     <div className="flex flex-wrap gap-1">
                       {(product.allergens || []).length > 0 ? (
                         product.allergens.map(a => (
-                          <span key={a} className="text-[8px] font-black bg-red-50 text-red-500 px-1.5 py-0.5 rounded border border-red-100 uppercase" title={a}>
+                          <span key={a} className="text-[8px] font-black bg-red-50 text-red-500 px-1.5 py-0.5 rounded border border-red-100 uppercase">
                             {REVERSE_ALLERGEN_MAP[a] || a.substring(0,3)}
                           </span>
                         ))
@@ -262,9 +247,9 @@ export const ProductDatabaseViewer: React.FC<ProductDatabaseViewerProps> = ({
                 </tr>
               )) : (
                 <tr>
-                   <td colSpan={7} className="py-20 text-center">
+                   <td colSpan={6} className="py-20 text-center">
                       <Database size={48} className="mx-auto text-slate-200 mb-4" strokeWidth={1} />
-                      <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Sin resultados para el filtro actual</p>
+                      <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Sin resultados</p>
                    </td>
                 </tr>
               )}
@@ -273,51 +258,35 @@ export const ProductDatabaseViewer: React.FC<ProductDatabaseViewerProps> = ({
         </div>
       </div>
 
-      {/* Modal de Borrado Total con Doble Seguridad */}
       {showDeleteAllModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-rose-950/80 backdrop-blur-md p-4 animate-fadeIn">
           <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-md w-full overflow-hidden border-4 border-rose-500/20">
             <div className="bg-rose-600 text-white p-8 text-center">
               <AlertTriangle size={48} className="mx-auto mb-4 animate-bounce" />
               <h2 className="text-2xl font-black uppercase tracking-tighter">Acción Crítica</h2>
-              <p className="text-rose-100 text-[10px] font-black uppercase tracking-widest mt-2">Eliminación completa del inventario</p>
+              <p className="text-rose-100 text-[10px] font-black uppercase tracking-widest mt-2">Vaciado completo del catálogo</p>
             </div>
             <div className="p-8 space-y-6">
               <div className="bg-rose-50 p-4 rounded-2xl border border-rose-100 flex gap-4 items-center">
                  <AlertCircle size={24} className="text-rose-600 shrink-0" />
                  <p className="text-[11px] text-rose-800 font-bold leading-tight">
-                   Vas a borrar <strong>{products.length} productos</strong>. Esta acción romperá los costes de las recetas vinculadas.
+                   Vas a borrar <strong>{products.length} productos</strong>. Esta acción romperá los costes de las recetas.
                  </p>
               </div>
-              
               <div className="text-center">
                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-3 tracking-[0.2em]">
                    Escribe <span className="text-rose-600">ELIMINAR</span> para proceder
                  </label>
                  <input 
-                  type="text" 
-                  autoFocus
-                  value={deleteConfirmationText}
+                  type="text" autoFocus value={deleteConfirmationText}
                   onChange={e => setDeleteConfirmationText(e.target.value.toUpperCase())}
-                  className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-center text-rose-600 text-xl outline-none focus:border-rose-500 transition-all uppercase placeholder:opacity-10"
+                  className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-center text-rose-600 text-xl outline-none focus:border-rose-500 transition-all uppercase"
                   placeholder="CONFIRMACIÓN"
                  />
               </div>
-
               <div className="flex gap-3">
-                 <button 
-                  onClick={() => { setShowDeleteAllModal(false); setDeleteConfirmationText(''); }}
-                  className="flex-1 px-4 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-200 transition-colors"
-                 >
-                   Cancelar
-                 </button>
-                 <button 
-                  onClick={executeDeleteAll}
-                  disabled={deleteConfirmationText !== 'ELIMINAR'}
-                  className={`flex-1 px-4 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all ${deleteConfirmationText === 'ELIMINAR' ? 'bg-rose-600 text-white shadow-xl hover:bg-rose-700' : 'bg-slate-50 text-slate-200 pointer-events-none'}`}
-                 >
-                   Borrar Todo
-                 </button>
+                 <button onClick={() => { setShowDeleteAllModal(false); setDeleteConfirmationText(''); }} className="flex-1 px-4 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-200 transition-colors">Cancelar</button>
+                 <button onClick={executeDeleteAll} disabled={deleteConfirmationText !== 'ELIMINAR'} className={`flex-1 px-4 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all ${deleteConfirmationText === 'ELIMINAR' ? 'bg-rose-600 text-white shadow-xl hover:bg-rose-700' : 'bg-slate-50 text-slate-200 pointer-events-none'}`}>Borrar Todo</button>
               </div>
             </div>
           </div>
@@ -334,23 +303,17 @@ export const ProductDatabaseViewer: React.FC<ProductDatabaseViewerProps> = ({
             <form onSubmit={handleSave} className="p-8 space-y-6">
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Familia / Categoría</label>
-                <input required type="text" value={editingProduct.category} onChange={e => setEditingProduct({...editingProduct, category: e.target.value})} className="w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-2xl font-bold uppercase outline-none focus:ring-2 focus:ring-slate-900" />
+                <input required type="text" value={editingProduct.category} onChange={e => setEditingProduct({...editingProduct, category: e.target.value.toUpperCase()})} className="w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-2xl font-bold uppercase outline-none focus:ring-2 focus:ring-slate-900" />
               </div>
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Nombre del Producto</label>
-                <input required type="text" value={editingProduct.name} onChange={e => setEditingProduct({...editingProduct, name: e.target.value})} className="w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-2xl font-bold uppercase outline-none focus:ring-2 focus:ring-slate-900" />
+                <input required type="text" value={editingProduct.name} onChange={e => setEditingProduct({...editingProduct, name: e.target.value.toUpperCase()})} className="w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-2xl font-bold uppercase outline-none focus:ring-2 focus:ring-slate-900" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Precio €</label>
                   <div className="relative">
-                    <input 
-                      type="text" 
-                      value={editingProduct.pricePerUnit} 
-                      onChange={e => setEditingProduct({...editingProduct, pricePerUnit: e.target.value as any})} 
-                      className="w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-2xl font-mono font-bold outline-none focus:ring-2 focus:ring-slate-900" 
-                      placeholder="0.00"
-                    />
+                    <input type="text" value={editingProduct.pricePerUnit} onChange={e => setEditingProduct({...editingProduct, pricePerUnit: e.target.value as any})} className="w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-2xl font-mono font-bold outline-none focus:ring-2 focus:ring-slate-900" placeholder="0.00" />
                     <DollarSign className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" size={16}/>
                   </div>
                 </div>
