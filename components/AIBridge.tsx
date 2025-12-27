@@ -61,7 +61,27 @@ RECETA A DIGITALIZAR:
   const handleProcessJSON = () => {
     try {
       setError(null);
-      const data = JSON.parse(jsonInput);
+      let rawInput = jsonInput.trim();
+
+      // 1. Eliminar bloques de código Markdown si existen (```json ... ```)
+      if (rawInput.includes('```')) {
+        const match = rawInput.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (match && match[1]) {
+          rawInput = match[1];
+        } else {
+          rawInput = rawInput.replace(/```[a-z]*\n/ig, '').replace(/\n```/g, '');
+        }
+      }
+
+      // 2. LIMPIEZA CRÍTICA: Eliminar citas y etiquetas que algunas IAs añaden fuera de las comillas
+      // Esto elimina [cite_start], [cite_end] y [cite: 12, 13]
+      const cleanedInput = rawInput
+        .replace(/\[cite_start\]/g, '')
+        .replace(/\[cite_end\]/g, '')
+        .replace(/\[cite:.*?\]/g, '')
+        .trim();
+
+      const data = JSON.parse(cleanedInput);
       
       if (!data.name || !data.elaborations) {
         throw new Error("El JSON no tiene el formato correcto (faltan campos obligatorios).");
@@ -72,13 +92,13 @@ RECETA A DIGITALIZAR:
         id: `sr_${Date.now()}_${idx}`,
         name: elab.name || 'Elaboración',
         instructions: elab.instructions || '',
-        photo: '',
+        photos: [],
         ingredients: (elab.ingredients || []).map((ing: any, iIdx: number) => ({
           id: `ing_${Date.now()}_${idx}_${iIdx}`,
           name: (ing.name || '').toUpperCase(),
           quantity: String(ing.quantity || '0'),
           unit: ing.unit || 'kg',
-          allergens: [], // Se vincularán al guardar si existen en el catálogo
+          allergens: [], 
           cost: 0
         }))
       }));
@@ -105,9 +125,11 @@ RECETA A DIGITALIZAR:
       };
 
       onImport(newRecipe);
+      setJsonInput(''); // Limpiar tras éxito
       alert(`¡Éxito! La receta "${newRecipe.name}" se ha digitalizado correctamente.`);
     } catch (err) {
-      setError("Error al procesar el JSON. Asegúrate de que la IA te haya devuelto el código correctamente.");
+      console.error("Parse error:", err);
+      setError("Error al procesar el JSON. Asegúrate de que la IA te haya devuelto el código correctamente (se han eliminado automáticamente las etiquetas [cite] si existían).");
     }
   };
 
@@ -176,9 +198,12 @@ RECETA A DIGITALIZAR:
               </div>
 
               {error && (
-                <div className="flex items-center gap-2 text-rose-600 bg-rose-50 p-4 rounded-xl border border-rose-100 animate-fadeIn">
-                   <AlertCircle size={20} className="shrink-0" />
-                   <p className="text-[10px] font-black uppercase tracking-tight">{error}</p>
+                <div className="flex items-start gap-3 text-rose-600 bg-rose-50 p-4 rounded-2xl border border-rose-100 animate-fadeIn">
+                   <AlertCircle size={20} className="shrink-0 mt-0.5" />
+                   <div className="space-y-1">
+                      <p className="text-[10px] font-black uppercase tracking-tight">Error al procesar el JSON</p>
+                      <p className="text-[9px] font-bold opacity-80 leading-tight">La IA ha incluido caracteres que no pertenecen al código (como citas o etiquetas). Asegúrate de copiar solo el bloque de código JSON.</p>
+                   </div>
                 </div>
               )}
 
