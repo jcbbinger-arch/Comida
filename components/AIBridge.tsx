@@ -63,34 +63,47 @@ RECETA A DIGITALIZAR:
       setError(null);
       let rawInput = jsonInput.trim();
 
-      // 1. Eliminar bloques de código Markdown si existen (```json ... ```)
+      // 1. Limpieza de bloques Markdown (```json ... ```)
       if (rawInput.includes('```')) {
-        const match = rawInput.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        const match = rawInput.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
         if (match && match[1]) {
           rawInput = match[1];
-        } else {
-          rawInput = rawInput.replace(/```[a-z]*\n/ig, '').replace(/\n```/g, '');
         }
       }
 
-      // 2. LIMPIEZA CRÍTICA: Eliminar citas y etiquetas que algunas IAs añaden fuera de las comillas
-      // Esto elimina [cite_start], [cite_end] y [cite: 12, 13]
-      const cleanedInput = rawInput
-        .replace(/\[cite_start\]/g, '')
-        .replace(/\[cite_end\]/g, '')
-        .replace(/\[cite:.*?\]/g, '')
-        .trim();
+      // 2. Limpieza agresiva de Citas de IA (ej: [cite_start], [cite: 2])
+      // Limpiamos esto ANTES de buscar las llaves para no confundir al parser
+      let cleaned = rawInput
+        .replace(/\[cite_start\]/gi, '')
+        .replace(/\[cite_end\]/gi, '')
+        .replace(/\[cite:.*?\]/gi, '')
+        .replace(/\\\[cite:.*?\\\]/gi, ''); // Por si vienen escapadas
 
-      const data = JSON.parse(cleanedInput);
-      
-      if (!data.name || !data.elaborations) {
-        throw new Error("El JSON no tiene el formato correcto (faltan campos obligatorios).");
+      // 3. Extracción de bloque JSON: Buscar desde el primer { hasta el último }
+      // Esto ignora cualquier texto basura que la IA haya puesto antes o después del objeto
+      const firstBrace = cleaned.indexOf('{');
+      const lastBrace = cleaned.lastIndexOf('}');
+
+      if (firstBrace === -1 || lastBrace === -1) {
+        throw new Error("No se ha detectado un objeto JSON válido (falta '{' o '}').");
       }
 
-      // Convertir el formato de la IA al formato de la App
-      const subRecipes: SubRecipe[] = data.elaborations.map((elab: any, idx: number) => ({
+      const jsonString = cleaned.substring(firstBrace, lastBrace + 1);
+
+      // 4. Parseo final
+      const data = JSON.parse(jsonString);
+      
+      if (!data.name || (!data.elaborations && !data.subRecipes)) {
+        throw new Error("El JSON no tiene la estructura de receta esperada.");
+      }
+
+      // Compatibilidad con campos que la IA podría nombrar diferente
+      const rawSubRecipes = data.elaborations || data.subRecipes || [];
+
+      // Convertir el formato de la IA al formato interno de la App
+      const subRecipes: SubRecipe[] = rawSubRecipes.map((elab: any, idx: number) => ({
         id: `sr_${Date.now()}_${idx}`,
-        name: elab.name || 'Elaboración',
+        name: (elab.name || 'Elaboración').toUpperCase(),
         instructions: elab.instructions || '',
         photos: [],
         ingredients: (elab.ingredients || []).map((ing: any, iIdx: number) => ({
@@ -125,11 +138,11 @@ RECETA A DIGITALIZAR:
       };
 
       onImport(newRecipe);
-      setJsonInput(''); // Limpiar tras éxito
-      alert(`¡Éxito! La receta "${newRecipe.name}" se ha digitalizado correctamente.`);
+      setJsonInput(''); 
+      alert(`¡Digitalización Exitosa! "${newRecipe.name}" añadida a tu catálogo.`);
     } catch (err) {
       console.error("Parse error:", err);
-      setError("Error al procesar el JSON. Asegúrate de que la IA te haya devuelto el código correctamente (se han eliminado automáticamente las etiquetas [cite] si existían).");
+      setError("Error de Sintaxis. La IA ha devuelto un código con errores estructurales. Asegúrate de copiar el bloque completo desde la primera llave { hasta la última }.");
     }
   };
 
@@ -147,7 +160,7 @@ RECETA A DIGITALIZAR:
               </div>
               <div>
                  <h1 className="text-3xl font-black text-slate-800 tracking-tighter uppercase">Puente de Digitalización IA</h1>
-                 <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Convierte texto, fotos o audios en fichas técnicas en segundos.</p>
+                 <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Digitalización inteligente libre de errores de citación.</p>
               </div>
            </div>
         </div>
@@ -162,7 +175,7 @@ RECETA A DIGITALIZAR:
               <span className="bg-emerald-500 text-slate-900 text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest mb-8 inline-block">Paso 1</span>
               <h2 className="text-4xl font-black text-white uppercase tracking-tighter leading-none mb-6">Copia el<br/><span className="text-emerald-400">Prompt Maestro</span></h2>
               <p className="text-slate-400 text-sm leading-relaxed mb-8 font-medium">
-                Hemos diseñado una instrucción ultra-precisa para que Gemini 3 o ChatGPT entiendan exactamente cómo estructurar tu receta sin errores.
+                Hemos optimizado el prompt para que la IA estructure los datos exactamente como tu sistema los necesita.
               </p>
             </div>
 
@@ -179,7 +192,7 @@ RECETA A DIGITALIZAR:
             <span className="bg-slate-900 text-white text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest mb-8 inline-block self-start">Paso 2</span>
             <h2 className="text-4xl font-black text-slate-900 uppercase tracking-tighter leading-none mb-6">Importa el<br/><span className="text-emerald-600">Resultado</span></h2>
             <p className="text-slate-500 text-sm leading-relaxed mb-8 font-medium">
-              Una vez la IA te devuelva el código JSON, pégalo aquí debajo para pre-visualizar tu nueva ficha técnica.
+              Pega el código JSON de la IA. El sistema limpiará automáticamente etiquetas inválidas como [cite] o [cite_start].
             </p>
 
             <div className="flex-grow flex flex-col gap-4">
@@ -188,21 +201,16 @@ RECETA A DIGITALIZAR:
                   value={jsonInput}
                   onChange={e => setJsonInput(e.target.value)}
                   className="w-full h-full min-h-[300px] p-6 bg-slate-50 border-2 border-slate-100 rounded-[2rem] font-mono text-xs focus:ring-2 focus:ring-emerald-500 outline-none resize-none transition-all placeholder:text-slate-300"
-                  placeholder="Pega el código JSON generado por la IA..."
+                  placeholder="Pega el código JSON aquí..."
                  />
-                 {jsonInput && !error && (
-                   <div className="absolute top-4 right-4 bg-emerald-100 text-emerald-600 p-2 rounded-full animate-pulse">
-                     <Check size={16}/>
-                   </div>
-                 )}
               </div>
 
               {error && (
                 <div className="flex items-start gap-3 text-rose-600 bg-rose-50 p-4 rounded-2xl border border-rose-100 animate-fadeIn">
                    <AlertCircle size={20} className="shrink-0 mt-0.5" />
                    <div className="space-y-1">
-                      <p className="text-[10px] font-black uppercase tracking-tight">Error al procesar el JSON</p>
-                      <p className="text-[9px] font-bold opacity-80 leading-tight">La IA ha incluido caracteres que no pertenecen al código (como citas o etiquetas). Asegúrate de copiar solo el bloque de código JSON.</p>
+                      <p className="text-[10px] font-black uppercase tracking-tight">Error de Sintaxis Detectado</p>
+                      <p className="text-[9px] font-bold opacity-80 leading-tight">{error}</p>
                    </div>
                 </div>
               )}
@@ -212,7 +220,7 @@ RECETA A DIGITALIZAR:
                 disabled={!jsonInput.trim()}
                 className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-3 shadow-xl hover:bg-slate-800 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
               >
-                <FileJson size={20}/> Crear Ficha desde JSON
+                <FileJson size={20}/> Limpiar e Importar Receta
               </button>
             </div>
           </div>
