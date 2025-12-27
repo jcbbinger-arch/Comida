@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useRef } from 'react';
 import { Product, Allergen, ALLERGEN_LIST } from '../types';
-import { Search, Plus, ArrowLeft, Edit2, Trash2, Save, X, Shield, Check, Download, Upload, DollarSign, Copy, FileJson, FileSpreadsheet, Database } from 'lucide-react';
+import { Search, Plus, ArrowLeft, Edit2, Trash2, Save, X, Shield, Check, Download, Upload, DollarSign, Database, AlertTriangle, AlertCircle, FileSpreadsheet } from 'lucide-react';
 
 interface ProductDatabaseViewerProps {
   products: Product[];
@@ -12,20 +12,27 @@ interface ProductDatabaseViewerProps {
   onImport: (products: Product[]) => void;
 }
 
-// Función de utilidad mejorada para detectar formato numérico ES
+// Mapeo de códigos de alérgenos para CSV
+const ALLERGEN_CODE_MAP: Record<string, Allergen> = {
+  'GLU': 'Gluten', 'CRU': 'Crustáceos', 'HUE': 'Huevos', 'PES': 'Pescado',
+  'CAC': 'Cacahuetes', 'SOY': 'Soja', 'LAC': 'Lácteos', 'FRA': 'Frutos de cáscara',
+  'API': 'Apio', 'MUS': 'Mostaza', 'SES': 'Sésamo', 'SUL': 'Sulfitos',
+  'ALT': 'Altramuces', 'MOL': 'Moluscos'
+};
+
+const REVERSE_ALLERGEN_MAP: Record<string, string> = Object.entries(ALLERGEN_CODE_MAP).reduce((acc, [code, name]) => ({ ...acc, [name]: code }), {});
+
 const parseSmartPrice = (val: any): number => {
   if (typeof val === 'number') return val;
-  if (!val) return 0;
+  if (!val || val === 'precio_no_disponible') return 0;
   let s = val.toString().trim().replace(/[€\s]/g, '');
   
   const lastComma = s.lastIndexOf(',');
   const lastDot = s.lastIndexOf('.');
 
   if (lastComma > lastDot) {
-    // Caso 1.234,56 o simplemente 5,37
     s = s.replace(/\./g, '').replace(',', '.');
   } else if (lastDot > lastComma) {
-    // Caso 1,234.56 o 5.37
     s = s.replace(/,/g, '');
   }
   
@@ -38,8 +45,9 @@ export const ProductDatabaseViewer: React.FC<ProductDatabaseViewerProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const csvInputRef = useRef<HTMLInputElement>(null);
 
   const filteredProducts = useMemo(() => {
     const term = searchTerm.toLowerCase();
@@ -48,49 +56,94 @@ export const ProductDatabaseViewer: React.FC<ProductDatabaseViewerProps> = ({
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [products, searchTerm]);
 
-  const processImportedList = (importedList: any[]) => {
-    const updatedDatabase = [...products];
-    let addedCount = 0;
-    let updatedCount = 0;
-
-    importedList.forEach((newProd: any) => {
-      const cleanName = newProd.name.trim();
-      const index = updatedDatabase.findIndex(p => p.name.trim().toLowerCase() === cleanName.toLowerCase());
-      
-      const price = parseSmartPrice(newProd.pricePerUnit);
-
-      const prodData: Product = {
-        id: index >= 0 ? updatedDatabase[index].id : `prod_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-        name: cleanName,
-        category: newProd.category || (index >= 0 ? updatedDatabase[index].category : 'Importado'),
-        unit: newProd.unit || (index >= 0 ? updatedDatabase[index].unit : 'kg'),
-        pricePerUnit: price,
-        allergens: Array.isArray(newProd.allergens) ? newProd.allergens : []
-      };
-
-      if (index >= 0) {
-        updatedDatabase[index] = prodData;
-        updatedCount++;
-      } else {
-        updatedDatabase.push(prodData);
-        addedCount++;
-      }
+  const handleExportCSV = () => {
+    const headers = "Nombre,Precio (€),Unidad,Alergenos";
+    const rows = products.map(p => {
+      const allergenCodes = p.allergens.map(a => REVERSE_ALLERGEN_MAP[a] || a).join('|');
+      const price = p.pricePerUnit === 0 ? 'precio_no_disponible' : p.pricePerUnit.toString();
+      // Si el nombre contiene comas, lo envolvemos en comillas (formato CSV estándar)
+      const name = p.name.includes(',') ? `"${p.name}"` : p.name;
+      return `${name},${price},${p.unit},${allergenCodes}`;
     });
+    
+    const csvContent = [headers, ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `inventario_maestro_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.click();
+  };
 
-    onImport(updatedDatabase);
-    return { addedCount, updatedCount };
+  const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result as string;
+        const lines = text.split(/\r?\n/).filter(line => line.trim() !== "");
+        // Saltamos la cabecera
+        const dataLines = lines.slice(1);
+        
+        const newProducts: Product[] = dataLines.map((line, index) => {
+          // Lógica robusta para manejar comas en nombres (ej: "Producto (4,5kg),precio,unit,allergens")
+          // Como sabemos que hay 4 campos, cortamos desde el final
+          const parts = line.split(',');
+          let name, priceRaw, unit, allergensRaw;
+
+          if (parts.length === 4) {
+            [name, priceRaw, unit, allergensRaw] = parts;
+          } else {
+            // Caso donde el nombre tiene comas internas
+            allergensRaw = parts[parts.length - 1];
+            unit = parts[parts.length - 2];
+            priceRaw = parts[parts.length - 3];
+            name = parts.slice(0, parts.length - 3).join(',').replace(/^"|"$/g, '');
+          }
+
+          const allergens: Allergen[] = (allergensRaw || "").split('|')
+            .filter(code => code.trim() !== "")
+            .map(code => ALLERGEN_CODE_MAP[code.trim()] || code as Allergen);
+
+          return {
+            id: `p_csv_${Date.now()}_${index}`,
+            name: name.trim().toUpperCase(),
+            pricePerUnit: parseSmartPrice(priceRaw),
+            unit: (unit || 'kg').trim(),
+            allergens: allergens,
+            category: 'Importado'
+          };
+        });
+
+        // Merge con los existentes por nombre
+        const updatedDatabase = [...products];
+        newProducts.forEach(newP => {
+          const idx = updatedDatabase.findIndex(p => p.name.toLowerCase() === newP.name.toLowerCase());
+          if (idx >= 0) {
+            updatedDatabase[idx] = { ...updatedDatabase[idx], ...newP, id: updatedDatabase[idx].id };
+          } else {
+            updatedDatabase.push(newP);
+          }
+        });
+
+        onImport(updatedDatabase);
+        alert(`Se han procesado ${newProducts.length} registros del CSV.`);
+      } catch (err) {
+        alert("Error al procesar el CSV. Verifica el formato del archivo.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
   };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProduct) return;
-    
-    // Asegurar parseo correcto del precio al guardar manualmente
     const finalProduct = {
       ...editingProduct,
       pricePerUnit: parseSmartPrice(editingProduct.pricePerUnit)
     };
-
     if (isCreating) onAdd(finalProduct);
     else onEdit(finalProduct);
     setEditingProduct(null);
@@ -101,6 +154,15 @@ export const ProductDatabaseViewer: React.FC<ProductDatabaseViewerProps> = ({
     const current = editingProduct.allergens || [];
     const updated = current.includes(allergen) ? current.filter(a => a !== allergen) : [...current, allergen];
     setEditingProduct({ ...editingProduct, allergens: updated });
+  };
+
+  const executeDeleteAll = () => {
+    if (deleteConfirmationText === 'ELIMINAR') {
+      onImport([]);
+      setShowDeleteAllModal(false);
+      setDeleteConfirmationText('');
+      alert("Base de datos borrada completamente.");
+    }
   };
 
   return (
@@ -122,7 +184,21 @@ export const ProductDatabaseViewer: React.FC<ProductDatabaseViewerProps> = ({
             </div>
           </div>
           <div className="flex gap-2 w-full md:w-auto flex-wrap">
-            <button onClick={() => { setEditingProduct({ id: `p_${Date.now()}`, name: '', category: 'Almacén', unit: 'kg', pricePerUnit: 0, allergens: [] }); setIsCreating(true); }} className="flex items-center gap-2 px-6 py-2 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-all font-black text-xs uppercase tracking-widest">
+            <input type="file" ref={fileInputRef} className="hidden" accept=".csv" onChange={handleImportCSV} />
+            <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-all font-black text-xs uppercase tracking-widest shadow-sm">
+              <Upload size={18} /> Importar CSV
+            </button>
+            <button onClick={handleExportCSV} className="flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl hover:bg-emerald-600 hover:text-white transition-all font-black text-xs uppercase tracking-widest shadow-sm">
+              <FileSpreadsheet size={18} /> Exportar CSV
+            </button>
+            <button 
+              onClick={() => setShowDeleteAllModal(true)} 
+              disabled={products.length === 0}
+              className="flex items-center gap-2 px-4 py-2 bg-rose-50 border border-rose-200 text-rose-600 rounded-xl hover:bg-rose-600 hover:text-white transition-all font-black text-xs uppercase tracking-widest shadow-sm disabled:opacity-30 disabled:pointer-events-none"
+            >
+              <Trash2 size={18} /> Borrar Todo
+            </button>
+            <button onClick={() => { setEditingProduct({ id: `p_${Date.now()}`, name: '', category: 'Almacén', unit: 'kg', pricePerUnit: 0, allergens: [] }); setIsCreating(true); }} className="flex items-center gap-2 px-6 py-2 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-all font-black text-xs uppercase tracking-widest shadow-lg ml-auto md:ml-0">
               <Plus size={18} /> Añadir
             </button>
           </div>
@@ -133,12 +209,6 @@ export const ProductDatabaseViewer: React.FC<ProductDatabaseViewerProps> = ({
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               <input type="text" placeholder="Filtrar catálogo..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl font-bold text-sm shadow-sm focus:ring-2 focus:ring-slate-900 transition-all" />
            </div>
-           
-           {searchTerm && (
-             <div className="bg-amber-100 text-amber-800 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-amber-200 shadow-sm animate-fadeIn">
-               Mostrando {filteredProducts.length} de {products.length} resultados
-             </div>
-           )}
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
@@ -154,7 +224,7 @@ export const ProductDatabaseViewer: React.FC<ProductDatabaseViewerProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {filteredProducts.map((product, idx) => (
+              {filteredProducts.length > 0 ? filteredProducts.map((product, idx) => (
                 <tr key={product.id} className="hover:bg-indigo-50/30 transition-colors group">
                   <td className="px-6 py-4">
                     <span className="bg-slate-100 text-slate-500 text-[10px] font-black px-2 py-1 rounded-md">{idx + 1}</span>
@@ -164,13 +234,17 @@ export const ProductDatabaseViewer: React.FC<ProductDatabaseViewerProps> = ({
                     <div className="text-[10px] text-slate-400 font-bold opacity-60 uppercase">{product.category}</div>
                   </td>
                   <td className="px-6 py-4 font-mono font-bold text-indigo-600">
-                    {product.pricePerUnit.toFixed(3)}€
+                    {product.pricePerUnit === 0 ? <span className="text-[10px] text-slate-400 font-bold">Sin precio</span> : `${product.pricePerUnit.toFixed(3)}€`}
                   </td>
                   <td className="px-6 py-4 text-slate-400 font-black uppercase text-[10px]">{product.unit}</td>
                   <td className="px-6 py-4">
                     <div className="flex flex-wrap gap-1">
                       {product.allergens?.length > 0 ? (
-                        product.allergens.map(a => <span key={a} className="text-[9px] font-black bg-red-50 text-red-500 px-2 py-0.5 rounded-lg border border-red-100 uppercase">{a.substring(0,3)}</span>)
+                        product.allergens.map(a => (
+                          <span key={a} className="text-[9px] font-black bg-red-50 text-red-500 px-2 py-0.5 rounded-lg border border-red-100 uppercase" title={a}>
+                            {REVERSE_ALLERGEN_MAP[a] || a.substring(0,3)}
+                          </span>
+                        ))
                       ) : <span className="text-[10px] text-green-500 font-bold uppercase flex items-center gap-1 opacity-40"><Check size={12}/> Limpio</span>}
                     </div>
                   </td>
@@ -181,11 +255,70 @@ export const ProductDatabaseViewer: React.FC<ProductDatabaseViewerProps> = ({
                     </div>
                   </td>
                 </tr>
-              ))}
+              )) : (
+                <tr>
+                   <td colSpan={6} className="py-20 text-center">
+                      <Database size={48} className="mx-auto text-slate-200 mb-4" strokeWidth={1} />
+                      <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">No hay productos en el inventario</p>
+                      <p className="text-slate-300 text-[10px] uppercase mt-1">Importa un archivo CSV o añade productos manualmente</p>
+                   </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {showDeleteAllModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-rose-950/80 backdrop-blur-md p-4 animate-fadeIn">
+          <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-md w-full overflow-hidden border-4 border-rose-500/20">
+            <div className="bg-rose-600 text-white p-8 text-center">
+              <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
+                <AlertTriangle size={40} />
+              </div>
+              <h2 className="text-2xl font-black uppercase tracking-tighter">¿Borrar Inventario?</h2>
+              <p className="text-rose-100 text-xs font-bold uppercase tracking-widest mt-2">Esta acción es irreversible</p>
+            </div>
+            <div className="p-8 space-y-6">
+              <div className="bg-rose-50 p-4 rounded-2xl border border-rose-100 flex gap-4">
+                 <AlertCircle size={24} className="text-rose-600 shrink-0" />
+                 <p className="text-[11px] text-rose-800 font-medium leading-relaxed">
+                   Se eliminarán <strong>{products.length} productos</strong>. Esto afectará a los escandallos de tus recetas si no tienes copias de seguridad.
+                 </p>
+              </div>
+              
+              <div>
+                 <label className="block text-[10px] font-black text-slate-400 uppercase mb-3 text-center tracking-widest">
+                   Escribe <span className="text-rose-600">ELIMINAR</span> para confirmar
+                 </label>
+                 <input 
+                  type="text" 
+                  value={deleteConfirmationText}
+                  onChange={e => setDeleteConfirmationText(e.target.value.toUpperCase())}
+                  className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-center text-rose-600 outline-none focus:border-rose-500 transition-all uppercase placeholder:opacity-20"
+                  placeholder="Escribe aquí..."
+                 />
+              </div>
+
+              <div className="flex gap-3">
+                 <button 
+                  onClick={() => { setShowDeleteAllModal(false); setDeleteConfirmationText(''); }}
+                  className="flex-1 px-4 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-200"
+                 >
+                   Cancelar
+                 </button>
+                 <button 
+                  onClick={executeDeleteAll}
+                  disabled={deleteConfirmationText !== 'ELIMINAR'}
+                  className={`flex-1 px-4 py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all ${deleteConfirmationText === 'ELIMINAR' ? 'bg-rose-600 text-white shadow-lg shadow-rose-200 hover:bg-rose-700' : 'bg-slate-100 text-slate-300 pointer-events-none'}`}
+                 >
+                   Eliminar Todo
+                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {editingProduct && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 animate-fadeIn">
@@ -201,7 +334,7 @@ export const ProductDatabaseViewer: React.FC<ProductDatabaseViewerProps> = ({
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Precio € (Usa coma para decimales)</label>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Precio €</label>
                   <div className="relative">
                     <input 
                       type="text" 
@@ -235,7 +368,7 @@ export const ProductDatabaseViewer: React.FC<ProductDatabaseViewerProps> = ({
                   })}
                 </div>
               </div>
-              <button type="submit" className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl transition-all hover:bg-slate-800">Actualizar Inventario</button>
+              <button type="submit" className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl transition-all hover:bg-slate-800">Guardar Cambios</button>
             </form>
           </div>
         </div>

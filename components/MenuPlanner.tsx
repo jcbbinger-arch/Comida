@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Recipe, AppSettings, ALLERGEN_LIST, Allergen, Product } from '../types';
-import { Plus, Trash2, ArrowLeft, Printer, Search, ArrowUp, ArrowDown, Calendar, FileText, Utensils, AlertOctagon, Users, ShoppingCart, BookOpen, ChevronRight, ChefHat, Info, Thermometer, User } from 'lucide-react';
+import { Plus, Trash2, ArrowLeft, Printer, Search, ArrowUp, ArrowDown, Calendar, FileText, Utensils, AlertOctagon, Users, ShoppingCart, BookOpen, ChevronRight, ChefHat, Info, Thermometer, User, DollarSign, Wallet } from 'lucide-react';
 
 const ALLERGEN_CONFIG: Record<Allergen, { color: string, short: string, icon: string }> = {
   'Gluten': { color: 'bg-yellow-100 text-yellow-800', short: 'GLU', icon: '🌾' },
@@ -40,8 +40,23 @@ export const MenuPlanner: React.FC<MenuPlannerProps> = ({ recipes, settings, onB
     (r.name.toLowerCase().includes(searchTerm.toLowerCase()) || r.category.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
+  // Cálculo de costes del menú
+  const menuEconomics = useMemo(() => {
+    let totalCost = 0;
+    selectedRecipes.forEach(recipe => {
+      // Coste por ración del plato original
+      const costPerPortion = (recipe.totalCost || 0) / (recipe.yieldQuantity || 1);
+      // Coste escalado al volumen del menú
+      totalCost += costPerPortion * menuPax;
+    });
+    return {
+      total: totalCost,
+      perPax: selectedRecipes.length > 0 ? totalCost / menuPax : 0
+    };
+  }, [selectedRecipes, menuPax]);
+
   const purchaseOrderData = useMemo(() => {
-    const families: Record<string, Record<string, { name: string, quantity: number, unit: string }>> = {};
+    const families: Record<string, Record<string, { name: string, quantity: number, unit: string, cost: number }>> = {};
     
     selectedRecipes.forEach(recipe => {
       const ratio = menuPax / recipe.yieldQuantity;
@@ -51,12 +66,14 @@ export const MenuPlanner: React.FC<MenuPlannerProps> = ({ recipes, settings, onB
           const family = product?.category || 'Otros';
           const qtyNum = parseFloat(ing.quantity.replace(',', '.'));
           const finalQty = isNaN(qtyNum) ? 0 : qtyNum * ratio;
+          const finalCost = (ing.pricePerUnit || 0) * finalQty;
 
           if (!families[family]) families[family] = {};
           if (!families[family][ing.name]) {
-            families[family][ing.name] = { name: ing.name, quantity: finalQty, unit: ing.unit };
+            families[family][ing.name] = { name: ing.name, quantity: finalQty, unit: ing.unit, cost: finalCost };
           } else {
             families[family][ing.name].quantity += finalQty;
+            families[family][ing.name].cost += finalCost;
           }
         });
       });
@@ -152,12 +169,26 @@ export const MenuPlanner: React.FC<MenuPlannerProps> = ({ recipes, settings, onB
 
             <div className="lg:col-span-7 bg-white rounded-3xl shadow-xl border border-gray-100 flex flex-col overflow-hidden h-[75vh]">
                <div className="p-8 border-b border-indigo-50 bg-indigo-50/30">
-                  <div className="flex items-center gap-4 mb-6">
-                    <div className="bg-indigo-600 p-3 rounded-2xl text-white shadow-lg"><Utensils size={24}/></div>
-                    <div>
-                      <h3 className="font-black text-indigo-900 uppercase tracking-widest">Configuración del Menú</h3>
-                      <p className="text-xs text-indigo-400 font-bold uppercase">Personaliza el servicio y volumen</p>
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-4">
+                      <div className="bg-indigo-600 p-3 rounded-2xl text-white shadow-lg"><Utensils size={24}/></div>
+                      <div>
+                        <h3 className="font-black text-indigo-900 uppercase tracking-widest">Configuración del Menú</h3>
+                        <p className="text-xs text-indigo-400 font-bold uppercase">Personaliza el servicio y volumen</p>
+                      </div>
                     </div>
+                    {selectedRecipes.length > 0 && (
+                      <div className="text-right flex items-center gap-3">
+                         <div className="bg-emerald-50 border border-emerald-100 px-4 py-2 rounded-2xl">
+                            <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Presupuesto Total</p>
+                            <p className="text-xl font-black text-emerald-700">{menuEconomics.total.toFixed(2)}€</p>
+                         </div>
+                         <div className="bg-amber-50 border border-amber-100 px-4 py-2 rounded-2xl">
+                            <p className="text-[9px] font-black text-amber-600 uppercase tracking-widest">Coste / Persona</p>
+                            <p className="text-xl font-black text-amber-700">{menuEconomics.perPax.toFixed(2)}€</p>
+                         </div>
+                      </div>
+                    )}
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="md:col-span-2">
@@ -181,23 +212,29 @@ export const MenuPlanner: React.FC<MenuPlannerProps> = ({ recipes, settings, onB
                        <p className="font-bold uppercase tracking-widest text-xs">Añade platos para empezar el menú</p>
                     </div>
                   ) : (
-                    selectedRecipes.map((recipe, idx) => (
-                      <div key={`${recipe.id}_${idx}`} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4 animate-fadeIn">
-                         <span className="font-black text-slate-200 text-xl w-8 text-center">{idx + 1}</span>
-                         <div className="w-14 h-14 bg-slate-50 rounded-xl overflow-hidden border border-slate-100">{recipe.photo && <img src={recipe.photo} className="w-full h-full object-cover" alt="" />}</div>
-                         <div className="flex-grow">
-                            <h4 className="font-black text-slate-800 text-sm uppercase tracking-tight truncate">{recipe.name}</h4>
-                            <p className="text-[10px] text-slate-400 font-bold italic truncate">Escalado a {menuPax} raciones</p>
-                         </div>
-                         <div className="flex items-center gap-2">
-                            <div className="flex flex-col gap-1">
-                              <button onClick={() => moveItem(idx, 'up')} className="p-1 text-slate-300 hover:text-slate-900 disabled:opacity-20" disabled={idx === 0}><ArrowUp size={16}/></button>
-                              <button onClick={() => moveItem(idx, 'down')} className="p-1 text-slate-300 hover:text-slate-900 disabled:opacity-20" disabled={idx === selectedRecipes.length -1}><ArrowDown size={16}/></button>
-                            </div>
-                            <button onClick={() => removeFromMenu(idx)} className="p-3 bg-red-50 text-red-400 rounded-xl hover:bg-red-500 hover:text-white transition-all"><Trash2 size={20}/></button>
-                         </div>
-                      </div>
-                    ))
+                    selectedRecipes.map((recipe, idx) => {
+                      const portionCost = (recipe.totalCost || 0) / (recipe.yieldQuantity || 1);
+                      return (
+                        <div key={`${recipe.id}_${idx}`} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4 animate-fadeIn">
+                           <span className="font-black text-slate-200 text-xl w-8 text-center">{idx + 1}</span>
+                           <div className="w-14 h-14 bg-slate-50 rounded-xl overflow-hidden border border-slate-100">{recipe.photo && <img src={recipe.photo} className="w-full h-full object-cover" alt="" />}</div>
+                           <div className="flex-grow">
+                              <h4 className="font-black text-slate-800 text-sm uppercase tracking-tight truncate">{recipe.name}</h4>
+                              <div className="flex items-center gap-3 mt-1">
+                                <p className="text-[10px] text-slate-400 font-bold italic truncate">Escalado a {menuPax} raciones</p>
+                                <span className="text-[9px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-lg font-black uppercase tracking-widest">Coste: {portionCost.toFixed(2)}€ / Pax</span>
+                              </div>
+                           </div>
+                           <div className="flex items-center gap-2">
+                              <div className="flex flex-col gap-1">
+                                <button onClick={() => moveItem(idx, 'up')} className="p-1 text-slate-300 hover:text-slate-900 disabled:opacity-20" disabled={idx === 0}><ArrowUp size={16}/></button>
+                                <button onClick={() => moveItem(idx, 'down')} className="p-1 text-slate-300 hover:text-slate-900 disabled:opacity-20" disabled={idx === selectedRecipes.length -1}><ArrowDown size={16}/></button>
+                              </div>
+                              <button onClick={() => removeFromMenu(idx)} className="p-3 bg-red-50 text-red-400 rounded-xl hover:bg-red-500 hover:text-white transition-all"><Trash2 size={20}/></button>
+                           </div>
+                        </div>
+                      );
+                    })
                   )}
                </div>
             </div>
@@ -320,6 +357,13 @@ export const MenuPlanner: React.FC<MenuPlannerProps> = ({ recipes, settings, onB
 
             <PrintHeader title="HOJA DE PEDIDO POR FAMILIAS" subtitle={`EVENTO: ${menuTitle} | VOLUMEN: ${menuPax} PAX | FECHA: ${eventDate}`} />
 
+            <div className="mb-8 flex justify-end">
+               <div className="border-2 border-slate-900 p-4 rounded-xl text-right">
+                  <p className="text-[10px] font-black uppercase text-slate-400">Presupuesto Estimado Pedido</p>
+                  <p className="text-2xl font-black text-slate-900">{menuEconomics.total.toFixed(2)}€</p>
+               </div>
+            </div>
+
             <div className="space-y-10">
                {purchaseOrderData.map(([family, items]) => (
                  <div key={family} className="break-inside-avoid border-t-4 border-slate-900 pt-4">
@@ -330,6 +374,7 @@ export const MenuPlanner: React.FC<MenuPlannerProps> = ({ recipes, settings, onB
                              <th className="py-2">Producto / Género</th>
                              <th className="py-2 text-right">Cantidad Total</th>
                              <th className="py-2 pl-4">Unidad</th>
+                             <th className="py-2 text-right">Coste Est.</th>
                           </tr>
                        </thead>
                        <tbody className="divide-y divide-slate-100">
@@ -338,6 +383,7 @@ export const MenuPlanner: React.FC<MenuPlannerProps> = ({ recipes, settings, onB
                                <td className="py-3 font-bold text-slate-800">{item.name}</td>
                                <td className="py-3 text-right font-mono font-black text-emerald-600">{item.quantity % 1 === 0 ? item.quantity : item.quantity.toFixed(3)}</td>
                                <td className="py-3 pl-4 font-bold text-slate-400 uppercase text-[10px]">{item.unit}</td>
+                               <td className="py-3 text-right font-mono text-slate-500">{item.cost.toFixed(2)}€</td>
                             </tr>
                           ))}
                        </tbody>
