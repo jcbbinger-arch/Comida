@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Recipe, AppSettings, AppBackup, Product, DEFAULT_CATEGORIES } from './types';
+import { Recipe, AppSettings, AppBackup, Product, MenuPlan, DEFAULT_CATEGORIES } from './types';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { Dashboard } from './components/Dashboard';
 import { RecipeEditor } from './components/RecipeEditor';
@@ -25,12 +25,12 @@ function App() {
   const [recipes, setRecipes] = useLocalStorage<Recipe[]>('recipes', []);
   const [settings, setSettings] = useLocalStorage<AppSettings>('appSettings', defaultSettings);
   const [productDatabase, setProductDatabase] = useLocalStorage<Product[]>('productDatabase', INITIAL_PRODUCT_DATABASE);
+  const [savedMenus, setSavedMenus] = useLocalStorage<MenuPlan[]>('savedMenus', []);
   
   const [viewState, setViewState] = useState<ViewState>('LANDING');
   const [currentRecipe, setCurrentRecipe] = useState<Recipe | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-  // Asegurar que las categorías dinámicas existan
   useEffect(() => {
     if (!settings.categories || settings.categories.length === 0) {
       setSettings(prev => ({ ...prev, categories: DEFAULT_CATEGORIES }));
@@ -91,6 +91,7 @@ function App() {
           setRecipes(backup.recipes);
           setSettings(backup.settings);
           if (backup.productDatabase) setProductDatabase(backup.productDatabase);
+          if (backup.savedMenus) setSavedMenus(backup.savedMenus);
           alert('Copia de seguridad restaurada correctamente.');
         }}
       />
@@ -109,7 +110,25 @@ function App() {
           onAddProduct={(p) => setProductDatabase(prev => [p, ...prev])}
         />
       ) : viewState === 'MENU_PLANNER' ? (
-        <MenuPlanner recipes={recipes} settings={settings} onBack={() => setViewState('DASHBOARD')} productDatabase={productDatabase} />
+        <MenuPlanner 
+          recipes={recipes} 
+          settings={settings} 
+          onBack={() => setViewState('DASHBOARD')} 
+          productDatabase={productDatabase}
+          savedMenus={savedMenus}
+          onSaveMenu={(menu) => {
+            setSavedMenus(prev => {
+              const idx = prev.findIndex(m => m.id === menu.id);
+              if (idx >= 0) {
+                const updated = [...prev];
+                updated[idx] = menu;
+                return updated;
+              }
+              return [menu, ...prev];
+            });
+          }}
+          onDeleteMenu={(id) => setSavedMenus(prev => prev.filter(m => m.id !== id))}
+        />
       ) : viewState === 'PRODUCT_DB' ? (
         <ProductDatabaseViewer products={productDatabase} onBack={() => setViewState('DASHBOARD')} onAdd={(p) => setProductDatabase([p, ...productDatabase])} onEdit={(p) => setProductDatabase(productDatabase.map(old => old.id === p.id ? p : old))} onDelete={(id) => setProductDatabase(productDatabase.filter(p => p.id !== id))} onImport={(list) => setProductDatabase([...list])} />
       ) : (

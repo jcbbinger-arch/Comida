@@ -24,7 +24,7 @@ export interface Ingredient {
   name: string;
   quantity: string; 
   unit: string;
-  category?: string; // Nueva propiedad para agrupamiento
+  category?: string;
   allergens: Allergen[];
   pricePerUnit?: number;
   cost?: number;
@@ -63,6 +63,15 @@ export interface Recipe {
   totalCost?: number;
 }
 
+export interface MenuPlan {
+  id: string;
+  title: string;
+  date: string;
+  pax: number;
+  recipeIds: string[];
+  lastModified: number;
+}
+
 export interface AppSettings {
   teacherName: string;
   instituteName: string;
@@ -77,6 +86,7 @@ export interface AppBackup {
   settings: AppSettings;
   recipes: Recipe[];
   productDatabase?: Product[];
+  savedMenus?: MenuPlan[];
 }
 
 export const DEFAULT_CATEGORIES = [

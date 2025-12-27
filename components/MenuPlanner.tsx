@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
-import { Recipe, AppSettings, ALLERGEN_LIST, Allergen, Product } from '../types';
-import { Plus, Trash2, ArrowLeft, Printer, Search, ArrowUp, ArrowDown, Calendar, FileText, Utensils, AlertOctagon, Users, ShoppingCart, BookOpen, ChevronRight, ChefHat, Info, Thermometer, User, DollarSign, Wallet } from 'lucide-react';
+import { Recipe, AppSettings, ALLERGEN_LIST, Allergen, Product, MenuPlan } from '../types';
+import { Plus, Trash2, ArrowLeft, Printer, Search, ArrowUp, ArrowDown, Calendar, FileText, Utensils, AlertOctagon, Users, ShoppingCart, BookOpen, ChevronRight, ChefHat, Info, Thermometer, User, DollarSign, Save, History, Clock, CheckCircle2 } from 'lucide-react';
 
 const ALLERGEN_CONFIG: Record<Allergen, { color: string, short: string, icon: string }> = {
   'Gluten': { color: 'bg-yellow-100 text-yellow-800', short: 'GLU', icon: '🌾' },
@@ -25,15 +25,22 @@ interface MenuPlannerProps {
   settings: AppSettings;
   onBack: () => void;
   productDatabase: Product[];
+  savedMenus: MenuPlan[];
+  onSaveMenu: (menu: MenuPlan) => void;
+  onDeleteMenu: (id: string) => void;
 }
 
-export const MenuPlanner: React.FC<MenuPlannerProps> = ({ recipes, settings, onBack, productDatabase }) => {
-  const [activeTab, setActiveTab] = useState<'planning' | 'service_order' | 'allergen_matrix' | 'purchase_order' | 'kitchen_fichas'>('planning');
+export const MenuPlanner: React.FC<MenuPlannerProps> = ({ 
+  recipes, settings, onBack, productDatabase, savedMenus, onSaveMenu, onDeleteMenu 
+}) => {
+  const [activeTab, setActiveTab] = useState<'planning' | 'service_order' | 'allergen_matrix' | 'purchase_order' | 'kitchen_fichas' | 'history'>('planning');
+  const [currentMenuId, setCurrentMenuId] = useState<string | null>(null);
   const [menuTitle, setMenuTitle] = useState('MENÚ DEL DÍA');
   const [eventDate, setEventDate] = useState(new Date().toISOString().split('T')[0]);
   const [menuPax, setMenuPax] = useState<number>(30);
   const [selectedRecipes, setSelectedRecipes] = useState<Recipe[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
   const filteredRecipes = recipes.filter(r => 
     !selectedRecipes.find(sr => sr.id === r.id) &&
@@ -75,6 +82,50 @@ export const MenuPlanner: React.FC<MenuPlannerProps> = ({ recipes, settings, onB
     });
     return Object.entries(families).sort(([a], [b]) => a.localeCompare(b));
   }, [selectedRecipes, menuPax, productDatabase]);
+
+  const handleSavePlan = (asNew: boolean = false) => {
+    if (selectedRecipes.length === 0) return;
+    setSaveStatus('saving');
+    const newId = (asNew || !currentMenuId) ? `menu_${Date.now()}` : currentMenuId;
+    const plan: MenuPlan = {
+      id: newId,
+      title: menuTitle,
+      date: eventDate,
+      pax: menuPax,
+      recipeIds: selectedRecipes.map(r => r.id),
+      lastModified: Date.now()
+    };
+    onSaveMenu(plan);
+    if (asNew || !currentMenuId) setCurrentMenuId(newId);
+    
+    setTimeout(() => {
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    }, 600);
+  };
+
+  const handleLoadPlan = (plan: MenuPlan) => {
+    setMenuTitle(plan.title);
+    setEventDate(plan.date);
+    setMenuPax(plan.pax);
+    setCurrentMenuId(plan.id);
+    
+    const matchedRecipes = plan.recipeIds
+      .map(id => recipes.find(r => r.id === id))
+      .filter(r => !!r) as Recipe[];
+    
+    setSelectedRecipes(matchedRecipes);
+    setActiveTab('planning');
+  };
+
+  const handleReset = () => {
+    if (confirm("¿Limpiar planificación actual?")) {
+      setSelectedRecipes([]);
+      setMenuTitle('MENÚ DEL DÍA');
+      setCurrentMenuId(null);
+      setMenuPax(30);
+    }
+  };
 
   const addToMenu = (recipe: Recipe) => setSelectedRecipes([...selectedRecipes, recipe]);
   const removeFromMenu = (index: number) => {
@@ -120,6 +171,64 @@ export const MenuPlanner: React.FC<MenuPlannerProps> = ({ recipes, settings, onB
     </div>
   );
 
+  if (activeTab === 'history') {
+    return (
+      <div className="min-h-screen bg-gray-50 p-6 md:p-10">
+        <div className="max-w-4xl mx-auto">
+           <div className="flex items-center justify-between mb-10">
+              <div className="flex items-center gap-4">
+                 <button onClick={() => setActiveTab('planning')} className="p-2 hover:bg-gray-200 rounded-full transition-colors text-slate-600">
+                    <ArrowLeft size={24} />
+                 </button>
+                 <div>
+                    <h1 className="text-3xl font-black text-slate-800 uppercase tracking-tighter">Histórico de Menús</h1>
+                    <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Planificaciones Guardadas</p>
+                 </div>
+              </div>
+              <button onClick={() => setActiveTab('planning')} className="flex items-center gap-2 px-6 py-2.5 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg">
+                <Plus size={16}/> Nueva Planificación
+              </button>
+           </div>
+
+           <div className="grid grid-cols-1 gap-4">
+              {savedMenus.length === 0 ? (
+                <div className="bg-white rounded-3xl p-20 text-center border border-dashed border-slate-300">
+                   <Clock size={48} className="mx-auto text-slate-200 mb-4" />
+                   <p className="font-bold uppercase tracking-widest text-[10px] text-slate-400">No hay menús guardados todavía</p>
+                </div>
+              ) : (
+                savedMenus.map(plan => (
+                  <div key={plan.id} className="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col md:flex-row justify-between items-center gap-6 hover:border-indigo-400 transition-all group shadow-sm">
+                     <div className="flex items-center gap-5">
+                        <div className="bg-slate-100 p-4 rounded-xl text-slate-400 group-hover:text-indigo-600 transition-colors">
+                           <Calendar size={28} />
+                        </div>
+                        <div>
+                           <h3 className="font-black text-slate-800 uppercase text-lg leading-none mb-2">{plan.title}</h3>
+                           <div className="flex items-center gap-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                              <span className="flex items-center gap-1"><Clock size={12}/> {plan.date}</span>
+                              <span className="flex items-center gap-1"><Users size={12}/> {plan.pax} PAX</span>
+                              <span className="bg-slate-50 px-2 py-0.5 rounded">{plan.recipeIds.length} PLATOS</span>
+                           </div>
+                        </div>
+                     </div>
+                     <div className="flex gap-2">
+                        <button onClick={() => handleLoadPlan(plan)} className="flex items-center gap-2 px-6 py-3 bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white rounded-xl transition-all font-black text-[10px] uppercase tracking-widest">
+                           Cargar Menú
+                        </button>
+                        <button onClick={() => confirm(`¿Borrar el menú ${plan.title}?`) && onDeleteMenu(plan.id)} className="p-3 text-rose-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all">
+                           <Trash2 size={20} />
+                        </button>
+                     </div>
+                  </div>
+                ))
+              )}
+           </div>
+        </div>
+      </div>
+    );
+  }
+
   if (activeTab === 'planning') {
     return (
       <div className="min-h-screen bg-gray-50 p-6">
@@ -130,6 +239,7 @@ export const MenuPlanner: React.FC<MenuPlannerProps> = ({ recipes, settings, onB
               <h1 className="text-3xl font-black text-slate-800 uppercase tracking-tighter">Planificador de Menús</h1>
             </div>
             <div className="flex gap-2 flex-wrap justify-center">
+               <button onClick={() => setActiveTab('history')} className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 font-bold text-xs uppercase tracking-widest transition-all shadow-sm"><History size={16}/> Histórico</button>
                <button onClick={() => setActiveTab('kitchen_fichas')} disabled={selectedRecipes.length === 0} className="flex items-center gap-2 px-5 py-2.5 bg-amber-500 text-slate-900 rounded-xl hover:bg-amber-600 disabled:opacity-50 font-bold text-xs uppercase tracking-widest transition-all shadow-md"><BookOpen size={16}/> Fichas Cocina</button>
                <button onClick={() => setActiveTab('purchase_order')} disabled={selectedRecipes.length === 0} className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 disabled:opacity-50 font-bold text-xs uppercase tracking-widest transition-all shadow-md"><ShoppingCart size={16}/> Pedido Familias</button>
                <button onClick={() => setActiveTab('service_order')} disabled={selectedRecipes.length === 0} className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-700 disabled:opacity-50 font-bold text-xs uppercase tracking-widest transition-all shadow-md"><FileText size={16}/> Orden Servicio</button>
@@ -172,15 +282,14 @@ export const MenuPlanner: React.FC<MenuPlannerProps> = ({ recipes, settings, onB
                       </div>
                     </div>
                     {selectedRecipes.length > 0 && (
-                      <div className="text-right flex items-center gap-3">
-                         <div className="bg-emerald-50 border border-emerald-100 px-4 py-2 rounded-2xl">
-                            <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest leading-none mb-1">Total Pedido</p>
-                            <p className="text-xl font-black text-emerald-700">{menuEconomics.total.toFixed(2)}€</p>
-                         </div>
-                         <div className="bg-amber-50 border border-amber-100 px-4 py-2 rounded-2xl">
-                            <p className="text-[9px] font-black text-amber-600 uppercase tracking-widest leading-none mb-1">Coste / Pax</p>
-                            <p className="text-xl font-black text-amber-700">{menuEconomics.perPax.toFixed(2)}€</p>
-                         </div>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => handleSavePlan()} 
+                          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${saveStatus === 'saved' ? 'bg-emerald-500 text-white' : 'bg-slate-900 text-white hover:bg-slate-800'}`}
+                        >
+                          {saveStatus === 'saving' ? 'Guardando...' : saveStatus === 'saved' ? <><CheckCircle2 size={14}/> Guardado</> : <><Save size={14}/> Guardar</>}
+                        </button>
+                        <button onClick={handleReset} className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all" title="Resetear"><Trash2 size={20}/></button>
                       </div>
                     )}
                   </div>
@@ -206,23 +315,29 @@ export const MenuPlanner: React.FC<MenuPlannerProps> = ({ recipes, settings, onB
                        <p className="font-bold uppercase tracking-widest text-[10px]">Añade platos para planificar el servicio</p>
                     </div>
                   ) : (
-                    selectedRecipes.map((recipe, idx) => (
-                        <div key={`${recipe.id}_${idx}`} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4 animate-fadeIn group">
-                           <span className="font-black text-slate-200 text-xl w-8 text-center">{idx + 1}</span>
-                           <div className="w-14 h-14 bg-slate-50 rounded-xl overflow-hidden border border-slate-100">{recipe.photo && <img src={recipe.photo} className="w-full h-full object-cover" alt="" />}</div>
-                           <div className="flex-grow">
-                              <h4 className="font-black text-slate-800 text-sm uppercase tracking-tight truncate">{recipe.name}</h4>
-                              <p className="text-[10px] text-slate-400 font-bold italic">Escalado: {menuPax} raciones</p>
-                           </div>
-                           <div className="flex items-center gap-2">
-                              <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={() => moveItem(idx, 'up')} className="p-1 text-slate-300 hover:text-slate-900" disabled={idx === 0}><ArrowUp size={16}/></button>
-                                <button onClick={() => moveItem(idx, 'down')} className="p-1 text-slate-300 hover:text-slate-900" disabled={idx === selectedRecipes.length -1}><ArrowDown size={16}/></button>
-                              </div>
-                              <button onClick={() => removeFromMenu(idx)} className="p-3 bg-red-50 text-red-400 rounded-xl hover:bg-red-500 hover:text-white transition-all"><Trash2 size={20}/></button>
-                           </div>
-                        </div>
-                    ))
+                    <>
+                      {selectedRecipes.map((recipe, idx) => (
+                          <div key={`${recipe.id}_${idx}`} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4 animate-fadeIn group">
+                             <span className="font-black text-slate-200 text-xl w-8 text-center">{idx + 1}</span>
+                             <div className="w-14 h-14 bg-slate-50 rounded-xl overflow-hidden border border-slate-100">{recipe.photo && <img src={recipe.photo} className="w-full h-full object-cover" alt="" />}</div>
+                             <div className="flex-grow">
+                                <h4 className="font-black text-slate-800 text-sm uppercase tracking-tight truncate">{recipe.name}</h4>
+                                <p className="text-[10px] text-slate-400 font-bold italic">Escalado: {menuPax} raciones</p>
+                             </div>
+                             <div className="flex items-center gap-2">
+                                <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button onClick={() => moveItem(idx, 'up')} className="p-1 text-slate-300 hover:text-slate-900" disabled={idx === 0}><ArrowUp size={16}/></button>
+                                  <button onClick={() => moveItem(idx, 'down')} className="p-1 text-slate-300 hover:text-slate-900" disabled={idx === selectedRecipes.length -1}><ArrowDown size={16}/></button>
+                                </div>
+                                <button onClick={() => removeFromMenu(idx)} className="p-3 bg-red-50 text-red-400 rounded-xl hover:bg-red-500 hover:text-white transition-all"><Trash2 size={20}/></button>
+                             </div>
+                          </div>
+                      ))}
+                      <div className="p-8 border-t border-slate-100 mt-6 bg-slate-50/50 rounded-2xl text-right">
+                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Coste Total Estimado</p>
+                         <p className="text-3xl font-black text-indigo-600">{menuEconomics.total.toFixed(2)}€</p>
+                      </div>
+                    </>
                   )}
                </div>
             </div>
@@ -410,7 +525,7 @@ export const MenuPlanner: React.FC<MenuPlannerProps> = ({ recipes, settings, onB
                           <th key={allergen} className="border border-slate-900 p-1 text-center font-black uppercase text-[8px]">
                              <div className="flex flex-col items-center justify-end h-36 pb-3">
                                 <span className="text-xl mb-3">{ALLERGEN_CONFIG[allergen].icon}</span>
-                                <span className="[writing-mode:vertical-lr] rotate-180 transform whitespace-nowrap font-black tracking-tighter text-slate-800">
+                                <span className="[writing-mode:vertical-lr] rotate-180 transform font-black tracking-tighter text-slate-800">
                                    {allergen.toUpperCase()}
                                 </span>
                              </div>
