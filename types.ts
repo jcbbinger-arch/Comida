@@ -35,7 +35,7 @@ export interface SubRecipe {
   name: string;
   ingredients: Ingredient[];
   instructions: string;
-  photos: string[]; // Actualizado a array
+  photos: string[];
 }
 
 export interface ServiceDetails {
@@ -105,12 +105,12 @@ export const SERVICE_TYPES = [
 ];
 
 export const CUTLERY_DICTIONARY = {
-  "Carnes": "Tenedor trinchero + Cuchillo de carne",
-  "Pescado": "Tenedor de pescado + Pala de pescado",
-  "Entremeses": "Tenedor de entremés + Cuchillo de entremés",
-  "Sopas": "Cuchara de sopa",
-  "Postres": "Tenedor de postre + Cuchillo de postre (o cuchara)",
-  "Quesos": "Cuchillo de queso + Tenedor pequeño (opcional)"
+  "Carnes": "Cuchillo trinchero + Tenedor trinchero (Para cortar y sujetar)",
+  "Pescado": "Pala de pescado + Tenedor de pescado (Hoja flexible, sin filo)",
+  "Entremeses": "Tenedor pequeño (+ cuchillo mini si se necesita) (Para entradas frías/ligeras)",
+  "Sopas": "Cuchara de sopa o de consomé (Forma según tipo de caldo)",
+  "Postres": "Cuchillo + tenedor y/o cuchara de postre (Se colocan arriba del plato)",
+  "Quesos": "Cuchillo(s) de queso (+ tenedor pequeño) (Varía según dureza)"
 };
 
 export const TEMPERATURE_DICTIONARY = {
@@ -120,27 +120,39 @@ export const TEMPERATURE_DICTIONARY = {
     { label: "Al Punto", value: "60–63 °C" },
     { label: "Bien Hecho", value: "68–72 °C" }
   ],
-  "Aves": [
-    { label: "Pollo/Pavo", value: "Mínimo 74 °C (sin rosa)" }
+  "Aves (Pollo, Pavo)": [
+    { label: "Mínimo Seguro", value: "74 °C (sin rosa)" }
   ],
   "Cerdo": [
-    { label: "Jugoso", value: "63–65 °C" },
+    { label: "Jugoso y Seguro", value: "63–65 °C" },
     { label: "Bien Hecho", value: "70–72 °C" }
   ],
   "Cordero": [
     { label: "Jugoso", value: "52–55 °C" },
     { label: "Al Punto", value: "60–63 °C" }
   ],
-  "Pescados": [
-    { label: "Blanco (Suave)", value: "55–60 °C" },
-    { label: "Azul (Rosado)", value: "50–55 °C" },
-    { label: "Azul (Cocido)", value: "60–65 °C" }
+  "Pescado Blanco": [
+    { label: "Merluza/Lenguado", value: "55–60 °C (suave)" }
   ],
-  "Otros": [
-    { label: "Mariscos (Gambas)", value: "60–65 °C" },
-    { label: "Pulpo/Calamares", value: "70–75 °C" },
-    { label: "Pastas/Arroces", value: "65–70 °C" },
-    { label: "Verduras", value: "60–65 °C" },
-    { label: "Ensaladas", value: "4–8 °C" }
+  "Pescado Azul": [
+    { label: "A la plancha", value: "50–55 °C (rosado)" },
+    { label: "Bien Cocido", value: "60–65 °C" }
+  ],
+  "Mariscos": [
+    { label: "Gambas/Langostinos", value: "60–65 °C (nacarado)" },
+    { label: "Calamares/Pulpo", value: "70–75 °C (tiernos)" }
+  ],
+  "Arroces y Pastas": [
+    { label: "Servicio Caliente", value: "65–70 °C" }
+  ],
+  "Verduras": [
+    { label: "Asadas/Vapor", value: "60–65 °C (crujientes)" }
+  ],
+  "Sopas y Cremas": [
+    { label: "Ligeras", value: "60–65 °C" },
+    { label: "Contundentes", value: "70–75 °C" }
+  ],
+  "Fríos": [
+    { label: "Ensaladas/Tartares", value: "4–8 °C" }
   ]
 };
