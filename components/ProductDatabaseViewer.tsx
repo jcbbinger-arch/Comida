@@ -12,7 +12,7 @@ interface ProductDatabaseViewerProps {
   onImport: (products: Product[]) => void;
 }
 
-// Mapeo de códigos de alérgenos para CSV
+// Mapeo de códigos de alérgenos para CSV (Seguimos el estándar del archivo proporcionado)
 const ALLERGEN_CODE_MAP: Record<string, Allergen> = {
   'GLU': 'Gluten', 'CRU': 'Crustáceos', 'HUE': 'Huevos', 'PES': 'Pescado',
   'CAC': 'Cacahuetes', 'SOY': 'Soja', 'LAC': 'Lácteos', 'FRA': 'Frutos de cáscara',
@@ -52,18 +52,19 @@ export const ProductDatabaseViewer: React.FC<ProductDatabaseViewerProps> = ({
   const filteredProducts = useMemo(() => {
     const term = searchTerm.toLowerCase();
     return products
-      .filter(p => p.name.toLowerCase().includes(term) || p.category?.toLowerCase().includes(term))
+      .filter(p => p.name.toLowerCase().includes(term) || (p.category || "").toLowerCase().includes(term))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [products, searchTerm]);
 
   const handleExportCSV = () => {
-    const headers = "Nombre,Precio (€),Unidad,Alergenos";
+    // Formato exacto solicitado: Familia,Nombre,Precio (€),Unidad,Alergenos
+    const headers = "Familia,Nombre,Precio (€),Unidad,Alergenos";
     const rows = products.map(p => {
-      const allergenCodes = p.allergens.map(a => REVERSE_ALLERGEN_MAP[a] || a).join('|');
+      const allergenCodes = (p.allergens || []).map(a => REVERSE_ALLERGEN_MAP[a] || a).join('|');
       const price = p.pricePerUnit === 0 ? 'precio_no_disponible' : p.pricePerUnit.toString();
-      // Si el nombre contiene comas, lo envolvemos en comillas (formato CSV estándar)
       const name = p.name.includes(',') ? `"${p.name}"` : p.name;
-      return `${name},${price},${p.unit},${allergenCodes}`;
+      const family = (p.category || 'Varios').includes(',') ? `"${p.category}"` : p.category || 'Varios';
+      return `${family},${name},${price},${p.unit},${allergenCodes}`;
     });
     
     const csvContent = [headers, ...rows].join('\n');
@@ -71,7 +72,7 @@ export const ProductDatabaseViewer: React.FC<ProductDatabaseViewerProps> = ({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `inventario_maestro_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', `inventario_ies_la_flota_${new Date().toISOString().slice(0, 10)}.csv`);
     link.click();
   };
 
@@ -83,40 +84,38 @@ export const ProductDatabaseViewer: React.FC<ProductDatabaseViewerProps> = ({
       try {
         const text = event.target?.result as string;
         const lines = text.split(/\r?\n/).filter(line => line.trim() !== "");
-        // Saltamos la cabecera
+        // Saltamos la cabecera (Familia,Nombre,Precio (€),Unidad,Alergenos)
         const dataLines = lines.slice(1);
         
         const newProducts: Product[] = dataLines.map((line, index) => {
-          // Lógica robusta para manejar comas en nombres (ej: "Producto (4,5kg),precio,unit,allergens")
-          // Como sabemos que hay 4 campos, cortamos desde el final
-          const parts = line.split(',');
-          let name, priceRaw, unit, allergensRaw;
+          // Implementación simplificada para el formato específico
+          // Manejamos comillas si existen en el nombre o familia
+          const regex = /(".*?"|[^,]+|(?<=,)(?=,)|(?<=,)$)/g;
+          const matches = line.match(regex);
+          
+          if (!matches || matches.length < 4) return null;
 
-          if (parts.length === 4) {
-            [name, priceRaw, unit, allergensRaw] = parts;
-          } else {
-            // Caso donde el nombre tiene comas internas
-            allergensRaw = parts[parts.length - 1];
-            unit = parts[parts.length - 2];
-            priceRaw = parts[parts.length - 3];
-            name = parts.slice(0, parts.length - 3).join(',').replace(/^"|"$/g, '');
-          }
+          const family = matches[0].replace(/^"|"$/g, '').trim();
+          const name = matches[1].replace(/^"|"$/g, '').trim();
+          const priceRaw = matches[2].trim();
+          const unit = matches[3].trim();
+          const allergensRaw = matches[4] ? matches[4].trim() : "";
 
-          const allergens: Allergen[] = (allergensRaw || "").split('|')
+          const allergens: Allergen[] = allergensRaw.split('|')
             .filter(code => code.trim() !== "")
-            .map(code => ALLERGEN_CODE_MAP[code.trim()] || code as Allergen);
+            .map(code => ALLERGEN_CODE_MAP[code.trim().toUpperCase()] || code as Allergen);
 
           return {
             id: `p_csv_${Date.now()}_${index}`,
-            name: name.trim().toUpperCase(),
+            name: name.toUpperCase(),
             pricePerUnit: parseSmartPrice(priceRaw),
             unit: (unit || 'kg').trim(),
             allergens: allergens,
-            category: 'Importado'
+            category: family
           };
-        });
+        }).filter(p => p !== null) as Product[];
 
-        // Merge con los existentes por nombre
+        // Sincronización: Actualizar si existe por nombre, si no añadir
         const updatedDatabase = [...products];
         newProducts.forEach(newP => {
           const idx = updatedDatabase.findIndex(p => p.name.toLowerCase() === newP.name.toLowerCase());
@@ -128,13 +127,23 @@ export const ProductDatabaseViewer: React.FC<ProductDatabaseViewerProps> = ({
         });
 
         onImport(updatedDatabase);
-        alert(`Se han procesado ${newProducts.length} registros del CSV.`);
+        alert(`Sincronización completada: ${newProducts.length} productos procesados.`);
       } catch (err) {
-        alert("Error al procesar el CSV. Verifica el formato del archivo.");
+        alert("Error crítico al procesar el CSV. Asegúrate de que el formato sea: Familia,Nombre,Precio (€),Unidad,Alergenos");
       }
     };
     reader.readAsText(file);
     e.target.value = '';
+  };
+
+  // Fix: added missing toggleAllergen function to manage allergen selection in the editor
+  const toggleAllergen = (allergen: Allergen) => {
+    if (!editingProduct) return;
+    const current = editingProduct.allergens || [];
+    const updated = current.includes(allergen) 
+      ? current.filter(a => a !== allergen) 
+      : [...current, allergen];
+    setEditingProduct({ ...editingProduct, allergens: updated });
   };
 
   const handleSave = (e: React.FormEvent) => {
@@ -149,19 +158,12 @@ export const ProductDatabaseViewer: React.FC<ProductDatabaseViewerProps> = ({
     setEditingProduct(null);
   };
 
-  const toggleAllergen = (allergen: Allergen) => {
-    if (!editingProduct) return;
-    const current = editingProduct.allergens || [];
-    const updated = current.includes(allergen) ? current.filter(a => a !== allergen) : [...current, allergen];
-    setEditingProduct({ ...editingProduct, allergens: updated });
-  };
-
   const executeDeleteAll = () => {
     if (deleteConfirmationText === 'ELIMINAR') {
       onImport([]);
       setShowDeleteAllModal(false);
       setDeleteConfirmationText('');
-      alert("Base de datos borrada completamente.");
+      alert("Base de datos de productos eliminada.");
     }
   };
 
@@ -180,72 +182,75 @@ export const ProductDatabaseViewer: React.FC<ProductDatabaseViewerProps> = ({
                   <Database size={10} /> {products.length} Items
                 </span>
               </div>
-              <p className="text-slate-500 text-xs font-bold uppercase opacity-60">Control de Precios y Alérgenos</p>
+              <p className="text-slate-500 text-xs font-bold uppercase opacity-60">IES La Flota • Gestión de Escandallos</p>
             </div>
           </div>
-          <div className="flex gap-2 w-full md:w-auto flex-wrap">
+          <div className="flex gap-2 w-full md:w-auto flex-wrap justify-center">
             <input type="file" ref={fileInputRef} className="hidden" accept=".csv" onChange={handleImportCSV} />
-            <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-all font-black text-xs uppercase tracking-widest shadow-sm">
-              <Upload size={18} /> Importar CSV
+            <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-all font-black text-[10px] uppercase tracking-widest shadow-sm">
+              <Upload size={16} /> Importar CSV
             </button>
-            <button onClick={handleExportCSV} className="flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl hover:bg-emerald-600 hover:text-white transition-all font-black text-xs uppercase tracking-widest shadow-sm">
-              <FileSpreadsheet size={18} /> Exportar CSV
+            <button onClick={handleExportCSV} className="flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl hover:bg-emerald-600 hover:text-white transition-all font-black text-[10px] uppercase tracking-widest shadow-sm">
+              <FileSpreadsheet size={16} /> Exportar CSV
             </button>
             <button 
               onClick={() => setShowDeleteAllModal(true)} 
               disabled={products.length === 0}
-              className="flex items-center gap-2 px-4 py-2 bg-rose-50 border border-rose-200 text-rose-600 rounded-xl hover:bg-rose-600 hover:text-white transition-all font-black text-xs uppercase tracking-widest shadow-sm disabled:opacity-30 disabled:pointer-events-none"
+              className="flex items-center gap-2 px-4 py-2 bg-rose-50 border border-rose-200 text-rose-600 rounded-xl hover:bg-rose-600 hover:text-white transition-all font-black text-[10px] uppercase tracking-widest shadow-sm disabled:opacity-30"
             >
-              <Trash2 size={18} /> Borrar Todo
+              <Trash2 size={16} /> Vaciar Base
             </button>
-            <button onClick={() => { setEditingProduct({ id: `p_${Date.now()}`, name: '', category: 'Almacén', unit: 'kg', pricePerUnit: 0, allergens: [] }); setIsCreating(true); }} className="flex items-center gap-2 px-6 py-2 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-all font-black text-xs uppercase tracking-widest shadow-lg ml-auto md:ml-0">
-              <Plus size={18} /> Añadir
+            <button onClick={() => { setEditingProduct({ id: `p_${Date.now()}`, name: '', category: 'Almacén', unit: 'kg', pricePerUnit: 0, allergens: [] }); setIsCreating(true); }} className="flex items-center gap-2 px-6 py-2 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-all font-black text-[10px] uppercase tracking-widest shadow-lg ml-auto md:ml-0">
+              <Plus size={18} /> Nuevo Item
             </button>
           </div>
         </div>
 
-        <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-           <div className="relative max-w-md w-full">
+        <div className="mb-6">
+           <div className="relative max-w-md">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input type="text" placeholder="Filtrar catálogo..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl font-bold text-sm shadow-sm focus:ring-2 focus:ring-slate-900 transition-all" />
+              <input type="text" placeholder="Buscar por nombre o familia..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl font-bold text-sm shadow-sm focus:ring-2 focus:ring-slate-900 transition-all" />
            </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 border-b border-slate-100 text-slate-400 uppercase text-[10px] font-black tracking-widest">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden overflow-x-auto">
+          <table className="w-full text-left text-sm min-w-[800px]">
+            <thead className="bg-slate-50 border-b border-slate-100 text-slate-400 uppercase text-[9px] font-black tracking-widest">
               <tr>
                 <th className="px-6 py-4 w-16">Nº</th>
-                <th className="px-6 py-4">Género / Materia Prima</th>
-                <th className="px-6 py-4">Precio Mercado</th>
-                <th className="px-6 py-4">Unidad</th>
+                <th className="px-6 py-4">Familia</th>
+                <th className="px-6 py-4">Nombre / Género</th>
+                <th className="px-6 py-4">P. Mercado</th>
+                <th className="px-6 py-4">Ud.</th>
                 <th className="px-6 py-4">Alérgenos</th>
-                <th className="px-6 py-4 text-right">Acciones</th>
+                <th className="px-6 py-4 text-right">Gestión</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {filteredProducts.length > 0 ? filteredProducts.map((product, idx) => (
                 <tr key={product.id} className="hover:bg-indigo-50/30 transition-colors group">
                   <td className="px-6 py-4">
-                    <span className="bg-slate-100 text-slate-500 text-[10px] font-black px-2 py-1 rounded-md">{idx + 1}</span>
+                    <span className="text-[10px] font-black text-slate-300">{idx + 1}</span>
                   </td>
-                  <td className="px-6 py-4 font-black text-slate-800 uppercase tracking-tight">
+                  <td className="px-6 py-4">
+                    <span className="text-[10px] font-black bg-slate-100 text-slate-500 px-2 py-1 rounded uppercase tracking-tighter">{product.category || 'Varios'}</span>
+                  </td>
+                  <td className="px-6 py-4 font-black text-slate-800 uppercase text-xs tracking-tight">
                     {product.name}
-                    <div className="text-[10px] text-slate-400 font-bold opacity-60 uppercase">{product.category}</div>
                   </td>
                   <td className="px-6 py-4 font-mono font-bold text-indigo-600">
-                    {product.pricePerUnit === 0 ? <span className="text-[10px] text-slate-400 font-bold">Sin precio</span> : `${product.pricePerUnit.toFixed(3)}€`}
+                    {product.pricePerUnit === 0 ? <span className="text-[10px] text-slate-400">N/D</span> : `${product.pricePerUnit.toFixed(3)}€`}
                   </td>
                   <td className="px-6 py-4 text-slate-400 font-black uppercase text-[10px]">{product.unit}</td>
                   <td className="px-6 py-4">
                     <div className="flex flex-wrap gap-1">
-                      {product.allergens?.length > 0 ? (
+                      {(product.allergens || []).length > 0 ? (
                         product.allergens.map(a => (
-                          <span key={a} className="text-[9px] font-black bg-red-50 text-red-500 px-2 py-0.5 rounded-lg border border-red-100 uppercase" title={a}>
+                          <span key={a} className="text-[8px] font-black bg-red-50 text-red-500 px-1.5 py-0.5 rounded border border-red-100 uppercase" title={a}>
                             {REVERSE_ALLERGEN_MAP[a] || a.substring(0,3)}
                           </span>
                         ))
-                      ) : <span className="text-[10px] text-green-500 font-bold uppercase flex items-center gap-1 opacity-40"><Check size={12}/> Limpio</span>}
+                      ) : <Check size={14} className="text-green-300 opacity-50"/>}
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right">
@@ -257,10 +262,9 @@ export const ProductDatabaseViewer: React.FC<ProductDatabaseViewerProps> = ({
                 </tr>
               )) : (
                 <tr>
-                   <td colSpan={6} className="py-20 text-center">
+                   <td colSpan={7} className="py-20 text-center">
                       <Database size={48} className="mx-auto text-slate-200 mb-4" strokeWidth={1} />
-                      <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">No hay productos en el inventario</p>
-                      <p className="text-slate-300 text-[10px] uppercase mt-1">Importa un archivo CSV o añade productos manualmente</p>
+                      <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Sin resultados para el filtro actual</p>
                    </td>
                 </tr>
               )}
@@ -269,50 +273,50 @@ export const ProductDatabaseViewer: React.FC<ProductDatabaseViewerProps> = ({
         </div>
       </div>
 
+      {/* Modal de Borrado Total con Doble Seguridad */}
       {showDeleteAllModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-rose-950/80 backdrop-blur-md p-4 animate-fadeIn">
           <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-md w-full overflow-hidden border-4 border-rose-500/20">
             <div className="bg-rose-600 text-white p-8 text-center">
-              <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
-                <AlertTriangle size={40} />
-              </div>
-              <h2 className="text-2xl font-black uppercase tracking-tighter">¿Borrar Inventario?</h2>
-              <p className="text-rose-100 text-xs font-bold uppercase tracking-widest mt-2">Esta acción es irreversible</p>
+              <AlertTriangle size={48} className="mx-auto mb-4 animate-bounce" />
+              <h2 className="text-2xl font-black uppercase tracking-tighter">Acción Crítica</h2>
+              <p className="text-rose-100 text-[10px] font-black uppercase tracking-widest mt-2">Eliminación completa del inventario</p>
             </div>
             <div className="p-8 space-y-6">
-              <div className="bg-rose-50 p-4 rounded-2xl border border-rose-100 flex gap-4">
+              <div className="bg-rose-50 p-4 rounded-2xl border border-rose-100 flex gap-4 items-center">
                  <AlertCircle size={24} className="text-rose-600 shrink-0" />
-                 <p className="text-[11px] text-rose-800 font-medium leading-relaxed">
-                   Se eliminarán <strong>{products.length} productos</strong>. Esto afectará a los escandallos de tus recetas si no tienes copias de seguridad.
+                 <p className="text-[11px] text-rose-800 font-bold leading-tight">
+                   Vas a borrar <strong>{products.length} productos</strong>. Esta acción romperá los costes de las recetas vinculadas.
                  </p>
               </div>
               
-              <div>
-                 <label className="block text-[10px] font-black text-slate-400 uppercase mb-3 text-center tracking-widest">
-                   Escribe <span className="text-rose-600">ELIMINAR</span> para confirmar
+              <div className="text-center">
+                 <label className="block text-[10px] font-black text-slate-400 uppercase mb-3 tracking-[0.2em]">
+                   Escribe <span className="text-rose-600">ELIMINAR</span> para proceder
                  </label>
                  <input 
                   type="text" 
+                  autoFocus
                   value={deleteConfirmationText}
                   onChange={e => setDeleteConfirmationText(e.target.value.toUpperCase())}
-                  className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-center text-rose-600 outline-none focus:border-rose-500 transition-all uppercase placeholder:opacity-20"
-                  placeholder="Escribe aquí..."
+                  className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-center text-rose-600 text-xl outline-none focus:border-rose-500 transition-all uppercase placeholder:opacity-10"
+                  placeholder="CONFIRMACIÓN"
                  />
               </div>
 
               <div className="flex gap-3">
                  <button 
                   onClick={() => { setShowDeleteAllModal(false); setDeleteConfirmationText(''); }}
-                  className="flex-1 px-4 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-200"
+                  className="flex-1 px-4 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-200 transition-colors"
                  >
                    Cancelar
                  </button>
                  <button 
                   onClick={executeDeleteAll}
                   disabled={deleteConfirmationText !== 'ELIMINAR'}
-                  className={`flex-1 px-4 py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all ${deleteConfirmationText === 'ELIMINAR' ? 'bg-rose-600 text-white shadow-lg shadow-rose-200 hover:bg-rose-700' : 'bg-slate-100 text-slate-300 pointer-events-none'}`}
+                  className={`flex-1 px-4 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all ${deleteConfirmationText === 'ELIMINAR' ? 'bg-rose-600 text-white shadow-xl hover:bg-rose-700' : 'bg-slate-50 text-slate-200 pointer-events-none'}`}
                  >
-                   Eliminar Todo
+                   Borrar Todo
                  </button>
               </div>
             </div>
@@ -324,12 +328,16 @@ export const ProductDatabaseViewer: React.FC<ProductDatabaseViewerProps> = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 animate-fadeIn">
           <div className="bg-white rounded-[2rem] shadow-2xl max-w-lg w-full overflow-hidden">
             <div className="bg-slate-900 text-white px-8 py-5 flex justify-between items-center">
-              <h2 className="text-xl font-black uppercase tracking-tighter">{isCreating ? 'Nuevo Género' : 'Ficha de Producto'}</h2>
+              <h2 className="text-xl font-black uppercase tracking-tighter">{isCreating ? 'Nuevo Género' : 'Ficha de Item'}</h2>
               <button onClick={() => setEditingProduct(null)}><X size={24}/></button>
             </div>
             <form onSubmit={handleSave} className="p-8 space-y-6">
               <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Descripción Producto</label>
+                <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Familia / Categoría</label>
+                <input required type="text" value={editingProduct.category} onChange={e => setEditingProduct({...editingProduct, category: e.target.value})} className="w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-2xl font-bold uppercase outline-none focus:ring-2 focus:ring-slate-900" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Nombre del Producto</label>
                 <input required type="text" value={editingProduct.name} onChange={e => setEditingProduct({...editingProduct, name: e.target.value})} className="w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-2xl font-bold uppercase outline-none focus:ring-2 focus:ring-slate-900" />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -341,34 +349,35 @@ export const ProductDatabaseViewer: React.FC<ProductDatabaseViewerProps> = ({
                       value={editingProduct.pricePerUnit} 
                       onChange={e => setEditingProduct({...editingProduct, pricePerUnit: e.target.value as any})} 
                       className="w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-2xl font-mono font-bold outline-none focus:ring-2 focus:ring-slate-900" 
-                      placeholder="Ej: 5,37"
+                      placeholder="0.00"
                     />
                     <DollarSign className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" size={16}/>
                   </div>
                 </div>
                 <div>
                   <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Unidad</label>
-                  <select value={editingProduct.unit} onChange={e => setEditingProduct({...editingProduct, unit: e.target.value})} className="w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-slate-900">
-                    <option value="kg">kg (Kilo)</option>
-                    <option value="L">L (Litro)</option>
+                  <select value={editingProduct.unit} onChange={e => setEditingProduct({...editingProduct, unit: e.target.value})} className="w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none">
+                    <option value="kg">kg</option>
+                    <option value="L">L</option>
                     <option value="unidad">unidad</option>
+                    <option value="g">g</option>
                   </select>
                 </div>
               </div>
               <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Declaración de Alérgenos</label>
+                <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Alérgenos Declarados</label>
                 <div className="grid grid-cols-3 gap-2 bg-slate-50 p-4 rounded-2xl border border-slate-100 max-h-40 overflow-y-auto custom-scrollbar">
                   {ALLERGEN_LIST.map(a => {
                     const isSel = editingProduct.allergens.includes(a);
                     return (
                       <button key={a} type="button" onClick={() => toggleAllergen(a)} className={`px-2 py-2 rounded-xl text-[9px] font-black border transition-all uppercase ${isSel ? 'bg-red-50 border-red-500 text-red-700' : 'bg-white border-slate-100 text-slate-400'}`}>
-                        {a.substring(0,3)} {isSel && '✓'}
+                        {REVERSE_ALLERGEN_MAP[a] || a.substring(0,3)} {isSel && '✓'}
                       </button>
                     );
                   })}
                 </div>
               </div>
-              <button type="submit" className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl transition-all hover:bg-slate-800">Guardar Cambios</button>
+              <button type="submit" className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl transition-all hover:bg-slate-800">Confirmar Cambios</button>
             </form>
           </div>
         </div>
