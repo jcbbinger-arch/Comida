@@ -35,7 +35,7 @@ export interface SubRecipe {
   name: string;
   ingredients: Ingredient[];
   instructions: string;
-  photo: string;
+  photos: string[]; // Actualizado a array
 }
 
 export interface ServiceDetails {
@@ -85,7 +85,7 @@ export interface AppBackup {
   timestamp: number;
   settings: AppSettings;
   recipes: Recipe[];
-  productDatabase?: Product[];
+  productDatabase: Product[];
   savedMenus?: MenuPlan[];
 }
 
@@ -96,37 +96,51 @@ export const DEFAULT_CATEGORIES = [
 ];
 
 export const SERVICE_TYPES = [
-  { id: "americana", name: "Servicio a la Americana", desc: "Emplatado en Cocina. El camarero deposita por la derecha." },
-  { id: "inglesa", name: "Servicio a la Inglesa", desc: "Desde fuente por la izquierda con pinza de servicio." },
-  { id: "francesa", name: "Servicio a la Francesa", desc: "Se presenta fuente por la izquierda y el cliente se sirve solo." },
-  { id: "gueridon", name: "Servicio al Gueridón (o a la Rusa)", desc: "Trinchado o flambeado en carrito auxiliar frente al cliente." },
-  { id: "milieu", name: "Servicio de Plat de Milieu", desc: "Al centro para compartir. Requiere cubiertos de servicio." },
-  { id: "buffet", name: "Servicio de Buffet", desc: "Exposición en bandejas. Foco en desbarase y bebidas." }
+  { id: "americana", name: "Servicio a la Americana", desc: "Práctico, rápido, plato montado en cocina." },
+  { id: "inglesa", name: "Servicio a la Inglesa", desc: "Similar al americano, pero con mayor énfasis en presentación." },
+  { id: "francesa", name: "Servicio a la Francesa", desc: "Tradicional, todos los platos al mismo tiempo en fuentes." },
+  { id: "gueridon", name: "Servicio al Gueridón (o a la Rusa)", desc: "Teatral, preparación parcial en mesa frente al cliente." },
+  { id: "milieu", name: "Servicio de Plat de Milieu", desc: "Platos servidos en el centro de la mesa (similar a familiar)." },
+  { id: "buffet", name: "Servicio de Buffet", desc: "Autoservicio, alimentos expuestos en mesas o mostradores." }
 ];
 
 export const CUTLERY_DICTIONARY = {
-  "Entrantes y Cuchara": [
-    "Cuchara sopera (Cremas/Sopas)", "Cuchara de consomé", "Tenedor trinchero + Cuchara sopera (Spaghetti)", "Tenedor trinchero (Pasta corta)"
-  ],
-  "Pescados y Mariscos": [
-    "Pala + Tenedor de pescado", "Cuchillo/Tenedor pescado + Lavadedos", "Tenedor de pescado (Moluscos)", "Tenedor de cocktail"
-  ],
-  "Carnes": [
-    "Cuchillo trinchero + Tenedor trinchero", "Cuchillo de carne (Chuletero) + Tenedor", "Cuchillo y Tenedor trinchero (Aves/Caza)"
-  ],
-  "Postres": [
-    "Tenedor de postre (Tartas)", "Cuchillo + Tenedor de postre (Fruta)", "Cuchara de postre/café (Helados)", "Tenedor y cuchara de postre"
-  ]
+  "Carnes": "Tenedor trinchero + Cuchillo de carne",
+  "Pescado": "Tenedor de pescado + Pala de pescado",
+  "Entremeses": "Tenedor de entremés + Cuchillo de entremés",
+  "Sopas": "Cuchara de sopa",
+  "Postres": "Tenedor de postre + Cuchillo de postre (o cuchara)",
+  "Quesos": "Cuchillo de queso + Tenedor pequeño (opcional)"
 };
 
 export const TEMPERATURE_DICTIONARY = {
-  "Platos Calientes": [
-    "Sopas y Cremas: 70°C - 80°C", "Carne Poco hecha: 50°C - 55°C", "Carne al Punto: 60°C - 65°C", "Carne Muy hecha: 70°C+", "Pescados: 55°C - 63°C", "Guarniciones: 65°C - 75°C"
+  "Carnes Rojas": [
+    { label: "Jugoso", value: "52–55 °C" },
+    { label: "Medio", value: "57–60 °C" },
+    { label: "Al Punto", value: "60–63 °C" },
+    { label: "Bien Hecho", value: "68–72 °C" }
   ],
-  "Platos Fríos": [
-    "Ensaladas/Gazpachos: 4°C - 8°C", "Pescados Crudos: 2°C - 5°C", "Embutidos/Ibéricos: 18°C - 22°C", "Quesos Frescos: 4°C - 8°C", "Quesos Curados: 16°C - 18°C"
+  "Aves": [
+    { label: "Pollo/Pavo", value: "Mínimo 74 °C (sin rosa)" }
   ],
-  "Postres": [
-    "Postres Nevera: 4°C - 6°C", "Helados/Sorbetes: -12°C a -15°C", "Postres Calientes: 50°C - 60°C"
+  "Cerdo": [
+    { label: "Jugoso", value: "63–65 °C" },
+    { label: "Bien Hecho", value: "70–72 °C" }
+  ],
+  "Cordero": [
+    { label: "Jugoso", value: "52–55 °C" },
+    { label: "Al Punto", value: "60–63 °C" }
+  ],
+  "Pescados": [
+    { label: "Blanco (Suave)", value: "55–60 °C" },
+    { label: "Azul (Rosado)", value: "50–55 °C" },
+    { label: "Azul (Cocido)", value: "60–65 °C" }
+  ],
+  "Otros": [
+    { label: "Mariscos (Gambas)", value: "60–65 °C" },
+    { label: "Pulpo/Calamares", value: "70–75 °C" },
+    { label: "Pastas/Arroces", value: "65–70 °C" },
+    { label: "Verduras", value: "60–65 °C" },
+    { label: "Ensaladas", value: "4–8 °C" }
   ]
 };

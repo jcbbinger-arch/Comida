@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Recipe, AppSettings, AppBackup, Product, MenuPlan, DEFAULT_CATEGORIES } from './types';
+import { Recipe, AppSettings, AppBackup, Product, MenuPlan, DEFAULT_CATEGORIES, SubRecipe } from './types';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { Dashboard } from './components/Dashboard';
 import { RecipeEditor } from './components/RecipeEditor';
@@ -45,16 +45,30 @@ function App() {
 
   const migrateRecipeIfNeeded = (r: Recipe): Recipe => {
     const legacy = r as any;
-    if (legacy.subRecipes && legacy.subRecipes.length > 0) return r;
+    
+    // Migración de photo individual a photos[] en subRecetas
+    const updatedSubRecipes = (legacy.subRecipes || []).map((sr: any) => {
+      if (sr.photo !== undefined && sr.photos === undefined) {
+        return {
+          ...sr,
+          photos: sr.photo ? [sr.photo] : [],
+          photo: undefined
+        };
+      }
+      return sr;
+    });
+
+    if (legacy.subRecipes && legacy.subRecipes.length > 0 && updatedSubRecipes === legacy.subRecipes) return r;
+
     return {
       ...r,
       creator: legacy.creator || settings.teacherName,
-      subRecipes: [{
+      subRecipes: updatedSubRecipes.length > 0 ? updatedSubRecipes : [{
         id: 'legacy-1',
         name: 'Elaboración Principal',
         ingredients: legacy.ingredients || [],
         instructions: legacy.instructions || '',
-        photo: ''
+        photos: legacy.photo ? [legacy.photo] : []
       }],
       platingInstructions: legacy.platingInstructions || ''
     };
@@ -145,6 +159,8 @@ function App() {
         <Dashboard 
           recipes={recipes} 
           settings={settings} 
+          savedMenus={savedMenus}
+          productDatabase={productDatabase}
           onNew={handleCreateNew} 
           onEdit={handleEdit} 
           onView={handleView} 

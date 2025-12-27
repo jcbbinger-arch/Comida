@@ -23,7 +23,7 @@ REGLAS DE FORMATO:
 {
   "name": "Nombre de la receta",
   "category": "${settings.categories?.join('|') || 'Entrantes|Carnes|Pescados|Postres'}",
-  "yieldQuantity": 4,
+  "yieldQuantity": 4, 
   "yieldUnit": "raciones",
   "elaborations": [
     {
@@ -44,7 +44,9 @@ REGLAS DE FORMATO:
 }
 
 REGLAS TÉCNICAS:
-- Cantidades siempre numéricas o strings limpios (ej: "0.500").
+- "yieldQuantity" es el Rendimiento (PAX), SIEMPRE numérico.
+- "yieldUnit" es la Unidad de Medida (ej: raciones, pax, personas).
+- Cantidades de ingredientes siempre numéricas o strings limpios (ej: "0.500").
 - Si no hay datos de servicio, deja los campos vacíos "".
 
 RECETA A DIGITALIZAR:
